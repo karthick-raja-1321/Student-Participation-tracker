@@ -1,0 +1,227 @@
+// User Roles
+const ROLES = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  HOD: 'HOD',
+  FACULTY: 'FACULTY',
+  STUDENT: 'STUDENT'
+};
+
+// Permissions
+const PERMISSIONS = {
+  // Department Management
+  DEPARTMENT_CREATE: 'department:create',
+  DEPARTMENT_READ_ALL: 'department:read:all',
+  DEPARTMENT_READ_OWN: 'department:read:own',
+  DEPARTMENT_UPDATE: 'department:update',
+  DEPARTMENT_DELETE: 'department:delete',
+  
+  // User Management
+  USER_CREATE: 'user:create',
+  USER_READ_ALL: 'user:read:all',
+  USER_READ_ASSIGNED: 'user:read:assigned',
+  USER_UPDATE: 'user:update',
+  USER_DELETE: 'user:delete',
+  
+  // Student Management
+  STUDENT_CREATE: 'student:create',
+  STUDENT_READ_ALL: 'student:read:all',
+  STUDENT_UPDATE: 'student:update',
+  STUDENT_DELETE: 'student:delete',
+  
+  // Faculty Management
+  FACULTY_CREATE: 'faculty:create',
+  FACULTY_READ_ALL: 'faculty:read:all',
+  FACULTY_UPDATE: 'faculty:update',
+  FACULTY_DELETE: 'faculty:delete',
+  
+  // Event Management
+  EVENT_CREATE_INSTITUTION: 'event:create:institution',
+  EVENT_CREATE_DEPARTMENT: 'event:create:department',
+  EVENT_READ_ALL: 'event:read:all',
+  EVENT_READ_DEPARTMENT: 'event:read:department',
+  EVENT_UPDATE: 'event:update',
+  EVENT_DELETE: 'event:delete',
+  EVENT_PUBLISH: 'event:publish',
+  
+  // Submission Management
+  SUBMISSION_CREATE: 'submission:create',
+  SUBMISSION_READ_ALL: 'submission:read:all',
+  SUBMISSION_READ_ASSIGNED: 'submission:read:assigned',
+  SUBMISSION_READ_OWN: 'submission:read:own',
+  SUBMISSION_UPDATE_OWN: 'submission:update:own',
+  
+  // Approval Management
+  APPROVAL_PHASE_I_MENTOR: 'approval:phase_i:mentor',
+  APPROVAL_PHASE_I_ADVISOR: 'approval:phase_i:advisor',
+  APPROVAL_PHASE_I_HOD: 'approval:phase_i:hod',
+  APPROVAL_PHASE_II: 'approval:phase_ii',
+  APPROVAL_PHASE_II_INNOVATION_COORDINATOR: 'approval:phase_ii:innovation_coordinator',
+  APPROVAL_ON_DUTY: 'approval:on_duty',
+  
+  // Excel Management
+  EXCEL_IMPORT: 'excel:import',
+  EXCEL_EXPORT_ALL: 'excel:export:all',
+  EXCEL_EXPORT_DEPARTMENT: 'excel:export:department',
+  
+  // Reports
+  REPORT_VIEW_ALL: 'report:view:all',
+  REPORT_VIEW_DEPARTMENT: 'report:view:department',
+  REPORT_VIEW_ASSIGNED: 'report:view:assigned',
+  
+  // Notifications
+  NOTIFICATION_SEND_ALL: 'notification:send:all',
+  NOTIFICATION_SEND_DEPARTMENT: 'notification:send:department',
+  
+  // WhatsApp
+  WHATSAPP_SEND: 'whatsapp:send',
+  WHATSAPP_VIEW_LOGS: 'whatsapp:view:logs',
+  
+  // System Settings
+  SYSTEM_SETTINGS: 'system:settings',
+  SYSTEM_ADMIN: 'system:admin'
+};
+
+// Role-Permission Mapping
+const ROLE_PERMISSIONS = {
+  [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS),
+  
+  [ROLES.HOD]: [
+    PERMISSIONS.DEPARTMENT_READ_OWN,
+    PERMISSIONS.USER_CREATE,
+    PERMISSIONS.USER_READ_ALL,
+    PERMISSIONS.USER_UPDATE,
+    PERMISSIONS.STUDENT_CREATE,
+    PERMISSIONS.STUDENT_READ_ALL,
+    PERMISSIONS.STUDENT_UPDATE,
+    PERMISSIONS.STUDENT_DELETE,
+    PERMISSIONS.FACULTY_CREATE,
+    PERMISSIONS.FACULTY_READ_ALL,
+    PERMISSIONS.FACULTY_UPDATE,
+    PERMISSIONS.FACULTY_DELETE,
+    PERMISSIONS.EVENT_CREATE_DEPARTMENT,
+    PERMISSIONS.EVENT_READ_ALL,
+    PERMISSIONS.EVENT_UPDATE,
+    PERMISSIONS.EVENT_DELETE,
+    PERMISSIONS.EVENT_PUBLISH,
+    PERMISSIONS.SUBMISSION_READ_ALL,
+    PERMISSIONS.APPROVAL_PHASE_I_HOD,
+    PERMISSIONS.APPROVAL_PHASE_II,
+    PERMISSIONS.EXCEL_IMPORT,
+    PERMISSIONS.EXCEL_EXPORT_ALL,
+    PERMISSIONS.REPORT_VIEW_ALL,
+    PERMISSIONS.NOTIFICATION_SEND_DEPARTMENT,
+    PERMISSIONS.WHATSAPP_SEND,
+    PERMISSIONS.WHATSAPP_VIEW_LOGS
+  ],
+  
+  [ROLES.FACULTY]: [
+    PERMISSIONS.DEPARTMENT_READ_OWN,
+    PERMISSIONS.USER_READ_ASSIGNED,
+    PERMISSIONS.EVENT_READ_ALL,
+    PERMISSIONS.SUBMISSION_READ_ASSIGNED,
+    PERMISSIONS.APPROVAL_PHASE_I_MENTOR,
+    PERMISSIONS.APPROVAL_PHASE_I_ADVISOR,
+    PERMISSIONS.APPROVAL_PHASE_II_INNOVATION_COORDINATOR,
+    PERMISSIONS.APPROVAL_ON_DUTY,
+    PERMISSIONS.EXCEL_EXPORT_DEPARTMENT,
+    PERMISSIONS.REPORT_VIEW_ASSIGNED,
+    PERMISSIONS.NOTIFICATION_SEND_DEPARTMENT
+  ],
+  
+  [ROLES.STUDENT]: [
+    PERMISSIONS.DEPARTMENT_READ_OWN,
+    PERMISSIONS.EVENT_READ_ALL,
+    PERMISSIONS.SUBMISSION_CREATE,
+    PERMISSIONS.SUBMISSION_READ_OWN,
+    PERMISSIONS.SUBMISSION_UPDATE_OWN
+  ]
+};
+
+// Submission Status
+const SUBMISSION_STATUS = {
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  REVISION_REQUESTED: 'REVISION_REQUESTED'
+};
+
+// Phase II Status
+const PHASE_II_STATUS = {
+  NOT_STARTED: 'NOT_STARTED',
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+  OVERDUE: 'OVERDUE'
+};
+
+// Approval Levels
+const APPROVAL_LEVELS = {
+  MENTOR: 'MENTOR',
+  ADVISOR: 'ADVISOR',
+  HOD: 'HOD',
+  INNOVATION_COORDINATOR: 'INNOVATION_COORDINATOR',
+  SUPER_ADMIN: 'SUPER_ADMIN'
+};
+
+// Event Types
+const EVENT_TYPES = {
+  HACKATHON: 'HACKATHON',
+  WORKSHOP: 'WORKSHOP',
+  SEMINAR: 'SEMINAR',
+  COMPETITION: 'COMPETITION',
+  CONFERENCE: 'CONFERENCE',
+  SYMPOSIUM: 'SYMPOSIUM',
+  WEBINAR: 'WEBINAR',
+  OTHER: 'OTHER'
+};
+
+// Event Visibility
+const EVENT_VISIBILITY = {
+  DEPARTMENT: 'DEPARTMENT',
+  INSTITUTION: 'INSTITUTION',
+  EXTERNAL: 'EXTERNAL'
+};
+
+// Participation Types
+const PARTICIPATION_TYPES = {
+  INDIVIDUAL: 'INDIVIDUAL',
+  TEAM: 'TEAM'
+};
+
+// Notification Types
+const NOTIFICATION_TYPES = {
+  SUBMISSION: 'SUBMISSION',
+  APPROVAL: 'APPROVAL',
+  REJECTION: 'REJECTION',
+  REVISION: 'REVISION',
+  REMINDER: 'REMINDER',
+  GENERAL: 'GENERAL'
+};
+
+// File Upload Limits
+const FILE_LIMITS = {
+  MAX_SIZE: process.env.MAX_FILE_SIZE || 5242880, // 5MB
+  ALLOWED_TYPES: ['image/jpeg', 'image/png', 'application/pdf']
+};
+
+// Pagination
+const PAGINATION = {
+  DEFAULT_PAGE: 1,
+  DEFAULT_LIMIT: 10,
+  MAX_LIMIT: 100
+};
+
+module.exports = {
+  ROLES,
+  PERMISSIONS,
+  ROLE_PERMISSIONS,
+  SUBMISSION_STATUS,
+  PHASE_II_STATUS,
+  APPROVAL_LEVELS,
+  EVENT_TYPES,
+  EVENT_VISIBILITY,
+  PARTICIPATION_TYPES,
+  NOTIFICATION_TYPES,
+  FILE_LIMITS,
+  PAGINATION
+};
