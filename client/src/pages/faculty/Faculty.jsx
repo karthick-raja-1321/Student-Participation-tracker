@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Paper,
   Typography,
@@ -21,7 +21,7 @@ import {
   Divider,
   Grid,
 } from '@mui/material';
-import { Add, Edit, Delete, DeleteSweep } from '@mui/icons-material';
+import { Add, Edit, Delete, DeleteSweep, Clear } from '@mui/icons-material';
 import api from '../../utils/api';
 import { toast } from 'react-toastify';
 
@@ -46,6 +46,49 @@ const Faculty = () => {
     isInnovationCoordinator: false
   });
   const [selected, setSelected] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterDepartment, setFilterDepartment] = useState('');
+  const [filterDesignation, setFilterDesignation] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+
+  // Filtered and searched faculty
+  const filteredFaculty = useMemo(() => {
+    return faculty.filter(member => {
+      // Search filter - check multiple fields
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = 
+        member.userId?.firstName?.toLowerCase().includes(searchLower) ||
+        member.userId?.lastName?.toLowerCase().includes(searchLower) ||
+        member.userId?.email?.toLowerCase().includes(searchLower) ||
+        member.userId?.phone?.includes(searchQuery) ||
+        member.employeeId?.toLowerCase().includes(searchLower);
+
+      // Department filter
+      const matchesDepartment = !filterDepartment || member.departmentId?._id === filterDepartment;
+
+      // Designation filter
+      const matchesDesignation = !filterDesignation || member.designation?.toLowerCase() === filterDesignation.toLowerCase();
+
+      // Role filter
+      let matchesRole = true;
+      if (filterRole) {
+        if (filterRole === 'classadvisor') {
+          matchesRole = member.isClassAdvisor === true;
+        } else if (filterRole === 'innovationcoordinator') {
+          matchesRole = member.isInnovationCoordinator === true;
+        } else if (filterRole === 'noroles') {
+          matchesRole = !member.isClassAdvisor && !member.isInnovationCoordinator;
+        }
+      }
+
+      return matchesSearch && matchesDepartment && matchesDesignation && matchesRole;
+    });
+  }, [faculty, searchQuery, filterDepartment, filterDesignation, filterRole]);
+
+  // Get unique designations for filter
+  const uniqueDesignations = useMemo(() => {
+    return [...new Set(faculty.map(f => f.designation).filter(Boolean))].sort();
+  }, [faculty]);
 
   useEffect(() => {
     fetchFaculty();
@@ -208,7 +251,7 @@ const Faculty = () => {
 
   const handleSelectAll = (event) => {
     if (event.target.checked) {
-      setSelected(faculty.map(f => f._id));
+      setSelected(filteredFaculty.map(f => f._id));
     } else {
       setSelected([]);
     }
@@ -237,19 +280,26 @@ const Faculty = () => {
   };
 
   const handleDeleteFiltered = async () => {
-    if (faculty.length === 0) {
+    if (filteredFaculty.length === 0) {
       toast.warning('No faculty members found');
       return;
     }
-    if (!window.confirm(`Are you sure you want to delete all ${faculty.length} faculty member(s)?`)) return;
+    if (!window.confirm(`Are you sure you want to delete all ${filteredFaculty.length} faculty member(s)?`)) return;
     try {
-      await Promise.all(faculty.map(f => api.delete(`/faculty/${f._id}`)));
-      toast.success(`${faculty.length} faculty member(s) deleted successfully`);
+      await Promise.all(filteredFaculty.map(f => api.delete(`/faculty/${f._id}`)));
+      toast.success(`${filteredFaculty.length} faculty member(s) deleted successfully`);
       setSelected([]);
       fetchFaculty();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete faculty');
     }
+  };
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setFilterDepartment('');
+    setFilterDesignation('');
+    setFilterRole('');
   };
 
   return (
@@ -275,9 +325,9 @@ const Faculty = () => {
             startIcon={<DeleteSweep />}
             onClick={handleDeleteFiltered}
             sx={{ mr: 1 }}
-            disabled={faculty.length === 0}
+            disabled={filteredFaculty.length === 0}
           >
-            Delete All ({faculty.length})
+            Delete All ({filteredFaculty.length})
           </Button>
           <Button
             variant="contained"
@@ -289,19 +339,99 @@ const Faculty = () => {
         </Box>
       </Box>
 
+      {/* Search and Filter Section */}
+      <Paper sx={{ p: 2, mb: 3, backgroundColor: '#f5f5f5' }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2 }}>Search & Filter</Typography>
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search by name, email, phone, or Employee ID"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              variant="outlined"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              fullWidth
+              size="small"
+              select
+              label="Filter by Department"
+              value={filterDepartment}
+              onChange={(e) => setFilterDepartment(e.target.value)}
+              variant="outlined"
+            >
+              <MenuItem value="">All Departments</MenuItem>
+              {departments.map(d => (
+                <MenuItem key={d._id} value={d._id}>{d.code} - {d.name}</MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <TextField
+              fullWidth
+              size="small"
+              select
+              label="Filter by Designation"
+              value={filterDesignation}
+              onChange={(e) => setFilterDesignation(e.target.value)}
+              variant="outlined"
+            >
+              <MenuItem value="">All Designations</MenuItem>
+              {uniqueDesignations.map(des => (
+                <MenuItem key={des} value={des}>{des}</MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <TextField
+              fullWidth
+              size="small"
+              select
+              label="Filter by Role"
+              value={filterRole}
+              onChange={(e) => setFilterRole(e.target.value)}
+              variant="outlined"
+            >
+              <MenuItem value="">All Roles</MenuItem>
+              <MenuItem value="classadvisor">Class Advisor</MenuItem>
+              <MenuItem value="innovationcoordinator">Innovation Coordinator</MenuItem>
+              <MenuItem value="noroles">No Roles</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={12} md={2}>
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<Clear />}
+              onClick={handleClearFilters}
+              sx={{ height: '40px' }}
+            >
+              Clear Filters
+            </Button>
+          </Grid>
+        </Grid>
+        <Typography variant="caption" color="text.secondary">
+          Showing {filteredFaculty.length} of {faculty.length} faculty members
+        </Typography>
+      </Paper>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox">
                 <Checkbox
-                  indeterminate={selected.length > 0 && selected.length < faculty.length}
-                  checked={faculty.length > 0 && selected.length === faculty.length}
+                  indeterminate={selected.length > 0 && selected.length < filteredFaculty.length}
+                  checked={filteredFaculty.length > 0 && selected.length === filteredFaculty.length}
                   onChange={handleSelectAll}
                 />
               </TableCell>
               <TableCell>Employee ID</TableCell>
               <TableCell>Name</TableCell>
+              <TableCell>Department</TableCell>
               <TableCell>Designation</TableCell>
               <TableCell>Roles</TableCell>
               <TableCell>Email</TableCell>
@@ -312,18 +442,18 @@ const Faculty = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={9} align="center">
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : faculty.length === 0 ? (
+            ) : filteredFaculty.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={9} align="center">
                   No faculty found
                 </TableCell>
               </TableRow>
             ) : (
-              faculty.map((member) => {
+              filteredFaculty.map((member) => {
                 const roles = [];
                 if (member.isClassAdvisor && member.advisorForClasses?.length > 0) {
                   const advisor = member.advisorForClasses[0];
@@ -346,6 +476,7 @@ const Faculty = () => {
                     <TableCell>
                       {member.userId?.firstName} {member.userId?.lastName}
                     </TableCell>
+                    <TableCell>{member.departmentId?.code}</TableCell>
                     <TableCell>{member.designation}</TableCell>
                     <TableCell>{rolesText}</TableCell>
                     <TableCell>{member.userId?.email}</TableCell>
