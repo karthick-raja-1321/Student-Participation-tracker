@@ -17,6 +17,9 @@ import {
   TextField,
   MenuItem,
   Checkbox,
+  FormControlLabel,
+  Divider,
+  Grid,
 } from '@mui/material';
 import { Add, Edit, Delete, DeleteSweep } from '@mui/icons-material';
 import api from '../../utils/api';
@@ -36,7 +39,11 @@ const Faculty = () => {
     phone: '',
     employeeId: '',
     departmentId: '',
-    designation: ''
+    designation: '',
+    isClassAdvisor: false,
+    classAdvisorYear: '',
+    classAdvisorSection: '',
+    isInnovationCoordinator: false
   });
   const [selected, setSelected] = useState([]);
 
@@ -71,6 +78,7 @@ const Faculty = () => {
 
   const handleOpenEdit = (member) => {
     setEditingFaculty(member);
+    const classAdvisor = member.advisorForClasses?.[0];
     setForm({
       firstName: member.userId?.firstName || '',
       lastName: member.userId?.lastName || '',
@@ -78,7 +86,11 @@ const Faculty = () => {
       phone: member.userId?.phone || '',
       employeeId: member.employeeId,
       departmentId: member.departmentId?._id || '',
-      designation: member.designation || ''
+      designation: member.designation || '',
+      isClassAdvisor: member.isClassAdvisor || false,
+      classAdvisorYear: classAdvisor?.year || '',
+      classAdvisorSection: classAdvisor?.section || '',
+      isInnovationCoordinator: member.isInnovationCoordinator || false
     });
     setOpenEdit(true);
   };
@@ -93,8 +105,20 @@ const Faculty = () => {
         return toast.error('Please fill required fields');
       }
       
+      if (form.isClassAdvisor && (!form.classAdvisorYear || !form.classAdvisorSection)) {
+        return toast.error('Please fill Class Advisor year and section');
+      }
+      
       // Generate random password
       const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase() + '123';
+      
+      const advisorForClasses = form.isClassAdvisor ? [{
+        year: parseInt(form.classAdvisorYear),
+        section: form.classAdvisorSection.toUpperCase(),
+        departmentId: form.departmentId
+      }] : [];
+
+      const innovationCoordinatorFor = form.isInnovationCoordinator ? [form.departmentId] : [];
       
       const payload = {
         userData: {
@@ -108,13 +132,17 @@ const Faculty = () => {
         facultyData: {
           employeeId: form.employeeId,
           departmentId: form.departmentId,
-          designation: form.designation
+          designation: form.designation,
+          isClassAdvisor: form.isClassAdvisor,
+          advisorForClasses,
+          isInnovationCoordinator: form.isInnovationCoordinator,
+          innovationCoordinatorFor
         }
       };
       await api.post('/faculty', payload);
       toast.success(`Faculty added! Password: ${generatedPassword} (Share with faculty to login)`, { autoClose: 10000 });
       handleCloseAdd();
-      setForm({ firstName: '', lastName: '', email: '', phone: '', employeeId: '', departmentId: '', designation: '' });
+      setForm({ firstName: '', lastName: '', email: '', phone: '', employeeId: '', departmentId: '', designation: '', isClassAdvisor: false, classAdvisorYear: '', classAdvisorSection: '', isInnovationCoordinator: false });
       fetchFaculty();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to add faculty');
@@ -126,6 +154,19 @@ const Faculty = () => {
       if (!form.firstName || !form.lastName || !form.email || !form.employeeId || !form.departmentId) {
         return toast.error('Please fill required fields');
       }
+      
+      if (form.isClassAdvisor && (!form.classAdvisorYear || !form.classAdvisorSection)) {
+        return toast.error('Please fill Class Advisor year and section');
+      }
+
+      const advisorForClasses = form.isClassAdvisor ? [{
+        year: parseInt(form.classAdvisorYear),
+        section: form.classAdvisorSection.toUpperCase(),
+        departmentId: form.departmentId
+      }] : [];
+
+      const innovationCoordinatorFor = form.isInnovationCoordinator ? [form.departmentId] : [];
+
       const payload = {
         userData: {
           firstName: form.firstName,
@@ -137,13 +178,17 @@ const Faculty = () => {
         facultyData: {
           employeeId: form.employeeId,
           departmentId: form.departmentId,
-          designation: form.designation
+          designation: form.designation,
+          isClassAdvisor: form.isClassAdvisor,
+          advisorForClasses,
+          isInnovationCoordinator: form.isInnovationCoordinator,
+          innovationCoordinatorFor
         }
       };
       await api.put(`/faculty/${editingFaculty._id}`, payload);
       toast.success('Faculty updated');
       handleCloseEdit();
-      setForm({ firstName: '', lastName: '', email: '', phone: '', employeeId: '', departmentId: '', designation: '' });
+      setForm({ firstName: '', lastName: '', email: '', phone: '', employeeId: '', departmentId: '', designation: '', isClassAdvisor: false, classAdvisorYear: '', classAdvisorSection: '', isInnovationCoordinator: false });
       fetchFaculty();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update faculty');
@@ -258,7 +303,7 @@ const Faculty = () => {
               <TableCell>Employee ID</TableCell>
               <TableCell>Name</TableCell>
               <TableCell>Designation</TableCell>
-              <TableCell>Qualification</TableCell>
+              <TableCell>Roles</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Phone</TableCell>
               <TableCell align="right">Actions</TableCell>
@@ -278,38 +323,50 @@ const Faculty = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              faculty.map((member) => (
-                <TableRow key={member._id} selected={selected.includes(member._id)}>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      checked={selected.includes(member._id)}
-                      onChange={() => handleSelectOne(member._id)}
-                    />
-                  </TableCell>
-                  <TableCell>{member.employeeId}</TableCell>
-                  <TableCell>
-                    {member.userId?.firstName} {member.userId?.lastName}
-                  </TableCell>
-                  <TableCell>{member.designation}</TableCell>
-                  <TableCell>{member.qualification}</TableCell>
-                  <TableCell>{member.userId?.email}</TableCell>
-                  <TableCell>{member.userId?.phone}</TableCell>
-                  <TableCell align="right">
-                    <Button size="small" startIcon={<Edit />} onClick={() => handleOpenEdit(member)}>
-                      Edit
-                    </Button>
-                    <Button 
-                      size="small" 
-                      color="error" 
-                      startIcon={<Delete />} 
-                      onClick={() => handleDelete(member._id)}
-                      sx={{ ml: 1 }}
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+              faculty.map((member) => {
+                const roles = [];
+                if (member.isClassAdvisor && member.advisorForClasses?.length > 0) {
+                  const advisor = member.advisorForClasses[0];
+                  roles.push(`${advisor.year} ${advisor.section}`);
+                }
+                if (member.isInnovationCoordinator) {
+                  roles.push('Innovation Coordinator');
+                }
+                const rolesText = roles.length > 0 ? roles.join(', ') : 'No roles';
+
+                return (
+                  <TableRow key={member._id} selected={selected.includes(member._id)}>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selected.includes(member._id)}
+                        onChange={() => handleSelectOne(member._id)}
+                      />
+                    </TableCell>
+                    <TableCell>{member.employeeId}</TableCell>
+                    <TableCell>
+                      {member.userId?.firstName} {member.userId?.lastName}
+                    </TableCell>
+                    <TableCell>{member.designation}</TableCell>
+                    <TableCell>{rolesText}</TableCell>
+                    <TableCell>{member.userId?.email}</TableCell>
+                    <TableCell>{member.userId?.phone}</TableCell>
+                    <TableCell align="right">
+                      <Button size="small" startIcon={<Edit />} onClick={() => handleOpenEdit(member)}>
+                        Edit
+                      </Button>
+                      <Button 
+                        size="small" 
+                        color="error" 
+                        startIcon={<Delete />} 
+                        onClick={() => handleDelete(member._id)}
+                        sx={{ ml: 1 }}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -319,6 +376,7 @@ const Faculty = () => {
       <DialogTitle>Add Faculty</DialogTitle>
       <DialogContent dividers>
         <Box sx={{ display: 'grid', gap: 2, mt: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 2 }}>Basic Information</Typography>
           <TextField label="First Name" value={form.firstName} onChange={(e)=>setForm({...form, firstName:e.target.value})} required />
           <TextField label="Last Name" value={form.lastName} onChange={(e)=>setForm({...form, lastName:e.target.value})} required />
           <TextField label="Email" type="email" value={form.email} onChange={(e)=>setForm({...form, email:e.target.value})} required />
@@ -330,6 +388,44 @@ const Faculty = () => {
             ))}
           </TextField>
           <TextField label="Designation" value={form.designation} onChange={(e)=>setForm({...form, designation:e.target.value})} />
+
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Roles & Responsibilities</Typography>
+          
+          <FormControlLabel
+            control={<Checkbox checked={form.isClassAdvisor} onChange={(e)=>setForm({...form, isClassAdvisor:e.target.checked})} />}
+            label="Class Advisor"
+          />
+          {form.isClassAdvisor && (
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <TextField 
+                  label="Year" 
+                  type="number" 
+                  size="small"
+                  inputProps={{ min: 1, max: 4 }}
+                  value={form.classAdvisorYear} 
+                  onChange={(e)=>setForm({...form, classAdvisorYear:e.target.value})} 
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField 
+                  label="Section" 
+                  placeholder="e.g., A"
+                  size="small"
+                  value={form.classAdvisorSection} 
+                  onChange={(e)=>setForm({...form, classAdvisorSection:e.target.value})} 
+                  fullWidth
+                />
+              </Grid>
+            </Grid>
+          )}
+
+          <FormControlLabel
+            control={<Checkbox checked={form.isInnovationCoordinator} onChange={(e)=>setForm({...form, isInnovationCoordinator:e.target.checked})} />}
+            label="Innovation Coordinator"
+          />
         </Box>
       </DialogContent>
       <DialogActions>
@@ -341,6 +437,7 @@ const Faculty = () => {
       <DialogTitle>Edit Faculty</DialogTitle>
       <DialogContent dividers>
         <Box sx={{ display: 'grid', gap: 2, mt: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mt: 2 }}>Basic Information</Typography>
           <TextField label="First Name" value={form.firstName} onChange={(e)=>setForm({...form, firstName:e.target.value})} required />
           <TextField label="Last Name" value={form.lastName} onChange={(e)=>setForm({...form, lastName:e.target.value})} required />
           <TextField label="Email" type="email" value={form.email} onChange={(e)=>setForm({...form, email:e.target.value})} required />
@@ -352,6 +449,44 @@ const Faculty = () => {
             ))}
           </TextField>
           <TextField label="Designation" value={form.designation} onChange={(e)=>setForm({...form, designation:e.target.value})} />
+
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Roles & Responsibilities</Typography>
+          
+          <FormControlLabel
+            control={<Checkbox checked={form.isClassAdvisor} onChange={(e)=>setForm({...form, isClassAdvisor:e.target.checked})} />}
+            label="Class Advisor"
+          />
+          {form.isClassAdvisor && (
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <TextField 
+                  label="Year" 
+                  type="number" 
+                  size="small"
+                  inputProps={{ min: 1, max: 4 }}
+                  value={form.classAdvisorYear} 
+                  onChange={(e)=>setForm({...form, classAdvisorYear:e.target.value})} 
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField 
+                  label="Section" 
+                  placeholder="e.g., A"
+                  size="small"
+                  value={form.classAdvisorSection} 
+                  onChange={(e)=>setForm({...form, classAdvisorSection:e.target.value})} 
+                  fullWidth
+                />
+              </Grid>
+            </Grid>
+          )}
+
+          <FormControlLabel
+            control={<Checkbox checked={form.isInnovationCoordinator} onChange={(e)=>setForm({...form, isInnovationCoordinator:e.target.checked})} />}
+            label="Innovation Coordinator"
+          />
         </Box>
       </DialogContent>
       <DialogActions>

@@ -1,6 +1,7 @@
 const EventRegistration = require('../models/EventRegistration');
 const Event = require('../models/Event');
 const PhaseISubmission = require('../models/PhaseISubmission');
+const { notifySubmissionCreated, notifyMentorSelection } = require('../services/notification.service');
 
 // Get all registrations
 exports.getAllRegistrations = async (req, res, next) => {
@@ -29,28 +30,115 @@ exports.getAllRegistrations = async (req, res, next) => {
 // Create registration (Phase I)
 exports.createRegistration = async (req, res, next) => {
   try {
-    const registration = await EventRegistration.create(req.body);
+    const { eventId, studentId } = req.body;
     
-    // Create Phase I submission automatically
-    const phaseISubmission = await PhaseISubmission.create({
+    // Check if registration already exists
+    let registration = await EventRegistration.findOne({ eventId, studentId });
+    let isNewRegistration = false;
+    
+    if (registration) {
+      // Update existing registration with new data
+      registration = await EventRegistration.findByIdAndUpdate(
+        registration._id,
+        req.body,
+        { new: true, runValidators: true }
+      );
+    } else {
+      // Create new registration
+      registration = await EventRegistration.create(req.body);
+      isNewRegistration = true;
+      
+      // Update event participant count only for new registrations
+      await Event.findByIdAndUpdate(registration.eventId, {
+        $inc: { currentParticipants: registration.participationType === 'TEAM' ? registration.teamMembers.length : 1 },
+      });
+    }
+    
+    // Check if Phase I submission already exists
+    let phaseISubmission = await PhaseISubmission.findOne({
       eventId: registration.eventId,
       studentId: registration.studentId,
-      registrationId: registration._id,
-      status: 'PENDING',
-      submittedAt: new Date(),
     });
     
-    // Update event participant count
-    await Event.findByIdAndUpdate(registration.eventId, {
-      $inc: { currentParticipants: registration.registrationType === 'TEAM' ? registration.teamMembers.length : 1 },
-    });
+    if (!phaseISubmission) {
+      // Get event and student details
+      const event = await Event.findById(registration.eventId);
+      const Student = require('../models/Student');
+      const student = await Student.findById(registration.studentId);
+      
+      console.log('Student data:', {
+        id: student._id,
+        rollNumber: student.rollNumber,
+        advisorId: student.advisorId,
+        mentorId: student.mentorId,
+        mentorOverride: req.body.mentorId
+      });
+      
+      // Prefer mentorId provided by the student during submission; fall back to stored mentorId
+      const chosenMentorId = req.body.mentorId || student.mentorId;
+      if (!chosenMentorId) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Please select a mentor before submitting your On-Duty request.'
+        });
+      }
+
+      // Persist chosen mentor on the student record for future submissions
+      if (!student.mentorId || student.mentorId.toString() !== chosenMentorId.toString()) {
+        student.mentorId = chosenMentorId;
+        await student.save();
+      }
+      
+      // Check if student has advisor assigned
+      if (!student.advisorId) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Student must have an advisor assigned before submitting. Please contact your administrator.'
+        });
+      }
+      
+      // Create Phase I submission with required fields
+      phaseISubmission = await PhaseISubmission.create({
+        eventId: registration.eventId,
+        studentId: registration.studentId,
+        registrationId: registration._id,
+        departmentId: student.departmentId,
+        eventDetails: {
+          eventName: event.title,
+          venue: event.venue || 'TBD',
+          startDate: event.startDate,
+          endDate: event.endDate,
+          organizerName: event.organizer || 'TBD'
+        },
+        teamName: registration.teamName,
+        teamMembers: registration.teamMembers,
+        advisorId: student.advisorId._id || student.advisorId,
+        mentorId: chosenMentorId,
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+        isDraft: false
+      });
+      
+      // Notify approvers about new submission
+      await notifySubmissionCreated(phaseISubmission, event, student, event.departmentId);
+
+      // Notify the chosen mentor with team + event details
+      const mentorUserId = (await require('../models/Faculty').findById(chosenMentorId).select('userId'))?.userId;
+      await notifyMentorSelection({
+        mentorUserId,
+        student,
+        event,
+        registration
+      });
+    }
     
     const populatedRegistration = await EventRegistration.findById(registration._id)
       .populate('eventId', 'title eventType startDate')
       .populate('studentId', 'userId registerNumber');
     
-    res.status(201).json({
+    res.status(isNewRegistration ? 201 : 200).json({
       status: 'success',
+      message: isNewRegistration ? 'Registration created successfully' : 'Registration updated successfully',
       data: { 
         registration: populatedRegistration,
         phaseISubmission,

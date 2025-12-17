@@ -4,6 +4,7 @@ const EventView = require('../models/EventView');
 const Student = require('../models/Student');
 const Faculty = require('../models/Faculty');
 const PhaseIISubmission = require('../models/PhaseIISubmission');
+const { notifyEventCreation } = require('../services/notification.service');
 
 // Get all events
 exports.getAllEvents = async (req, res, next) => {
@@ -17,11 +18,16 @@ exports.getAllEvents = async (req, res, next) => {
     if (departmentId) filter.departmentId = departmentId;
     
     // Filter based on user role and visibility
+    // Students and Faculty can see:
+    // 1. INSTITUTION-wide events (visible to all)
+    // 2. DEPARTMENT events from their department
+    // 3. EXTERNAL events (open to all)
     // SUPER_ADMIN and HOD can see all events
     if (req.user.role === 'STUDENT' || req.user.role === 'FACULTY') {
       filter.$or = [
-        { visibility: 'PUBLIC' },
-        { departmentId: req.user.departmentId },
+        { visibility: 'INSTITUTION' },
+        { visibility: 'EXTERNAL' },
+        { visibility: 'DEPARTMENT', departmentId: req.user.departmentId },
       ];
     }
     
@@ -68,43 +74,108 @@ exports.getEventById = async (req, res, next) => {
 // Helper function to track event views
 async function trackEventView(eventId, user) {
   try {
+    // Only track views for STUDENT and FACULTY roles
+    const userType = user.role === 'STUDENT' ? 'STUDENT' : user.role === 'FACULTY' ? 'FACULTY' : null;
+    
+    // Don't track views for SUPER_ADMIN, HOD, etc.
+    if (!userType) {
+      console.log(`Skipping view tracking for role: ${user.role}`);
+      return;
+    }
+
     const viewData = {
       eventId,
       userId: user._id,
-      userType: user.role === 'STUDENT' ? 'STUDENT' : 'FACULTY',
+      userType,
     };
 
-    if (user.role === 'STUDENT') {
+    // Ensure we properly get and save the student/faculty ID
+    if (userType === 'STUDENT') {
       const student = await Student.findOne({ userId: user._id });
-      if (student) viewData.studentId = student._id;
-    } else if (user.role === 'FACULTY') {
+      if (student) {
+        viewData.studentId = student._id;
+      } else {
+        console.warn(`No student record found for userId: ${user._id}`);
+        return; // Don't track if no student record found
+      }
+    } else if (userType === 'FACULTY') {
       const faculty = await Faculty.findOne({ userId: user._id });
-      if (faculty) viewData.facultyId = faculty._id;
+      if (faculty) {
+        viewData.facultyId = faculty._id;
+      } else {
+        console.warn(`No faculty record found for userId: ${user._id}`);
+        return; // Don't track if no faculty record found
+      }
     }
 
-    // Update or create view record
-    await EventView.findOneAndUpdate(
-      { eventId, userId: user._id },
-      {
+    // Check if this user has already viewed this event
+    const existingView = await EventView.findOne({ eventId, userId: user._id });
+    
+    if (!existingView) {
+      // First time viewing - create new record and increment event count
+      await EventView.create({
         ...viewData,
+        viewCount: 1,
         lastViewedAt: new Date(),
-        $inc: { viewCount: 1 }
-      },
-      { upsert: true, new: true }
-    );
-
-    // Increment event view count
-    await Event.findByIdAndUpdate(eventId, { $inc: { viewCount: 1 } });
+      });
+      
+      // Increment event view count only for new views
+      await Event.findByIdAndUpdate(eventId, { $inc: { viewCount: 1 } });
+    } else {
+      // Already viewed before - just update the view record without incrementing event count
+      await EventView.findOneAndUpdate(
+        { eventId, userId: user._id },
+        {
+          lastViewedAt: new Date(),
+          $inc: { viewCount: 1 }
+        },
+        { new: true }
+      );
+    }
   } catch (error) {
     console.error('Error tracking event view:', error);
   }
 }
 
-// Register for event (increment count)
+// Register for event (with duplicate check)
 exports.registerForEvent = async (req, res, next) => {
   try {
+    const eventId = req.params.id;
+    const userId = req.user._id;
+
+    // Get student ID from user
+    const student = await Student.findOne({ userId });
+    if (!student) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Student profile not found',
+      });
+    }
+
+    // Check if student is already registered
+    const existingRegistration = await EventRegistration.findOne({
+      eventId,
+      studentId: student._id,
+    });
+
+    if (existingRegistration) {
+      return res.status(409).json({
+        status: 'error',
+        message: 'You are already registered for this event',
+      });
+    }
+
+    // Create new registration
+    const registration = await EventRegistration.create({
+      eventId,
+      studentId: student._id,
+      registrationType: 'INDIVIDUAL',
+      registrationDate: new Date(),
+    });
+
+    // Increment event registered count
     const event = await Event.findByIdAndUpdate(
-      req.params.id,
+      eventId,
       { $inc: { registeredCount: 1 } },
       { new: true }
     );
@@ -115,10 +186,11 @@ exports.registerForEvent = async (req, res, next) => {
         message: 'Event not found',
       });
     }
-    
+
     res.json({
       status: 'success',
-      data: { event },
+      message: 'Successfully registered for the event',
+      data: { event, registration },
     });
   } catch (error) {
     next(error);
@@ -137,8 +209,8 @@ exports.createEvent = async (req, res, next) => {
       eventData.departmentId = req.user.departmentId;
     }
 
-    // Record faculty ID if user is faculty
-    if (req.user.role === 'FACULTY') {
+    // Record faculty ID if user is faculty or HOD
+    if (req.user.role === 'FACULTY' || req.user.role === 'HOD') {
       const faculty = await Faculty.findOne({ userId: req.user._id });
       if (faculty) {
         eventData.createdByFacultyId = faculty._id;
@@ -146,6 +218,9 @@ exports.createEvent = async (req, res, next) => {
     }
     
     const event = await Event.create(eventData);
+    
+    // Notify all users about the new event
+    await notifyEventCreation(event, req.user);
     
     res.status(201).json({
       status: 'success',
@@ -319,6 +394,9 @@ exports.getFacultyWhoViewed = async (req, res, next) => {
 
     const filter = { eventId, userType: 'FACULTY' };
     
+    // Get total count of faculty who viewed (regardless of whether they have facultyId populated)
+    const totalCount = await EventView.countDocuments(filter);
+    
     const views = await EventView.find(filter)
       .populate({
         path: 'facultyId',
@@ -327,9 +405,7 @@ exports.getFacultyWhoViewed = async (req, res, next) => {
           { path: 'userId', select: 'firstName lastName email' }
         ]
       })
-      .sort({ lastViewedAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+      .sort({ lastViewedAt: -1 });
 
     let faculty = views
       .filter(v => v.facultyId) // Filter out views with null facultyId
@@ -355,13 +431,14 @@ exports.getFacultyWhoViewed = async (req, res, next) => {
       );
     }
 
-    const total = faculty.length;
+    // Apply pagination to the filtered results
+    const paginatedFaculty = faculty.slice((page - 1) * limit, page * limit);
 
     res.json({
-      faculty,
-      total,
+      faculty: paginatedFaculty,
+      total: totalCount,
       page: parseInt(page),
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(totalCount / limit)
     });
   } catch (error) {
     next(error);

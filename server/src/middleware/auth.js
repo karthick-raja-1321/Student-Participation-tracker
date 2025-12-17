@@ -40,7 +40,18 @@ const protect = async (req, res, next) => {
         });
       }
 
-      logger.info(`Auth successful for ${req.user.email}`);
+      // Apply simulated role if in test mode
+      if (req.user.isTestMode && req.user.simulatedRole) {
+        req.user.originalRole = req.user.role;
+        req.user.role = req.user.simulatedRole;
+        if (req.user.simulatedDepartmentId) {
+          req.user.originalDepartmentId = req.user.departmentId;
+          req.user.departmentId = req.user.simulatedDepartmentId;
+        }
+        logger.info(`Using simulated role for ${req.user.email}: ${req.user.simulatedRole} (original: ${req.user.originalRole})`);
+      }
+
+      logger.info(`Auth successful for ${req.user.email} - Role: ${req.user.role}`);
       next();
     } catch (err) {
       logger.warn(`Token verification failed: ${err.message}`);

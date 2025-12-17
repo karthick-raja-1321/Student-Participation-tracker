@@ -10,7 +10,7 @@ require('../models/Faculty');
 // Get all students
 exports.getAllStudents = async (req, res, next) => {
   try {
-    const { departmentId, year, section, search } = req.query;
+    const { departmentId, year, section, search, mentorView } = req.query;
     const filter = {};
     
     // Filter out inactive students (soft-deleted)
@@ -20,14 +20,23 @@ exports.getAllStudents = async (req, res, next) => {
     const userRole = req.user?.role;
     const userDept = req.user?.departmentId;
     
-    // SUPER_ADMIN can see all students
-    if (userRole === 'SUPER_ADMIN') {
-      // No department filter - see everything
-      if (departmentId) filter.departmentId = departmentId;
-    } else if (userRole === 'HOD' || userRole === 'FACULTY') {
-      if (userDept) filter.departmentId = userDept;
-    } else if (departmentId) {
-      filter.departmentId = departmentId;
+    // If mentorView is true, show only students mentored by current faculty
+    if (mentorView === 'true' && userRole === 'FACULTY') {
+      const Faculty = require('../models/Faculty');
+      const faculty = await Faculty.findOne({ userId: req.user._id });
+      if (faculty) {
+        filter.mentorId = faculty._id;
+      }
+    } else {
+      // SUPER_ADMIN can see all students
+      if (userRole === 'SUPER_ADMIN') {
+        // No department filter - see everything
+        if (departmentId) filter.departmentId = departmentId;
+      } else if (userRole === 'HOD' || userRole === 'FACULTY') {
+        if (userDept) filter.departmentId = userDept;
+      } else if (departmentId) {
+        filter.departmentId = departmentId;
+      }
     }
     
     if (year) filter.year = year;
@@ -41,13 +50,38 @@ exports.getAllStudents = async (req, res, next) => {
     const students = await Student.find(filter)
       .populate('userId', 'firstName lastName email phone')
       .populate('departmentId', 'name code')
-      .populate('advisorId', 'userId')
-      .populate('mentorId', 'userId')
+      .populate('advisorId', 'userId employeeId')
+      .populate('mentorId', 'userId employeeId')
       .sort({ year: 1, section: 1, rollNumber: 1 });
     
     res.json({
       status: 'success',
       data: { students },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get current logged-in student profile
+exports.getCurrentStudent = async (req, res, next) => {
+  try {
+    const student = await Student.findOne({ userId: req.user._id })
+      .populate('userId', 'firstName lastName email phone')
+      .populate('departmentId', 'name code')
+      .populate('advisorId', 'userId employeeId')
+      .populate('mentorId', 'userId employeeId');
+    
+    if (!student) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Student profile not found',
+      });
+    }
+    
+    res.json({
+      status: 'success',
+      data: student,
     });
   } catch (error) {
     next(error);

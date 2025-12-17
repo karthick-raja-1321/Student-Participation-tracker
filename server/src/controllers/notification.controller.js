@@ -1,4 +1,6 @@
 const Notification = require('../models/Notification');
+const { getSubmissionHistory, getApprovableSubmissions } = require('../services/notification.service');
+const Faculty = require('../models/Faculty');
 
 // Get all notifications for the current user
 exports.getNotifications = async (req, res, next) => {
@@ -104,6 +106,72 @@ exports.deleteNotification = async (req, res, next) => {
     res.json({
       status: 'success',
       message: 'Notification deleted'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get submission history for approvers (HOD, Class Advisors, Innovation Coordinators)
+exports.getSubmissionHistory = async (req, res, next) => {
+  try {
+    const { status } = req.query;
+    
+    // Only approvers can view submission history
+    if (!['HOD', 'FACULTY'].includes(req.user.role)) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Only approvers can view submission history'
+      });
+    }
+    
+    // Get faculty to determine department
+    const faculty = await Faculty.findOne({ userId: req.user._id });
+    if (!faculty) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Faculty record not found'
+      });
+    }
+    
+    // Get submission history
+    const history = await getSubmissionHistory(faculty.departmentId, status);
+    
+    res.json({
+      status: 'success',
+      data: { history }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get approvable submissions (new, approved, rejected)
+exports.getApprovableSubmissions = async (req, res, next) => {
+  try {
+    // Only approvers can view submissions
+    if (!['HOD', 'FACULTY'].includes(req.user.role)) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Only approvers can view submissions'
+      });
+    }
+    
+    // Get faculty to determine department
+    const faculty = await Faculty.findOne({ userId: req.user._id });
+    if (!faculty) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Faculty record not found'
+      });
+    }
+    
+    // Get approvable submissions
+    const submissions = await getApprovableSubmissions(faculty, faculty.departmentId);
+    
+    res.json({
+      status: 'success',
+      data: { submissions }
     });
   } catch (error) {
     next(error);

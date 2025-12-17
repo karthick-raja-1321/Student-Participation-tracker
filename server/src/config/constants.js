@@ -1,9 +1,18 @@
 // User Roles
 const ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
+  PRINCIPAL: 'PRINCIPAL',
   HOD: 'HOD',
   FACULTY: 'FACULTY',
   STUDENT: 'STUDENT'
+};
+
+// Faculty Sub-Roles
+const FACULTY_ROLES = {
+  CLASS_ADVISOR: 'CLASS_ADVISOR',
+  INNOVATION_COORDINATOR: 'INNOVATION_COORDINATOR',
+  MENTOR: 'MENTOR',
+  GENERAL: 'GENERAL'
 };
 
 // Permissions
@@ -51,7 +60,8 @@ const PERMISSIONS = {
   SUBMISSION_UPDATE_OWN: 'submission:update:own',
   
   // Approval Management
-  APPROVAL_PHASE_I_MENTOR: 'approval:phase_i:mentor',
+  APPROVAL_PHASE_I_INNOVATION_COORDINATOR: 'approval:phase_i:innovation_coordinator',
+  APPROVAL_PHASE_I_MENTOR: 'approval:phase_i:mentor', // Legacy alias
   APPROVAL_PHASE_I_ADVISOR: 'approval:phase_i:advisor',
   APPROVAL_PHASE_I_HOD: 'approval:phase_i:hod',
   APPROVAL_PHASE_II: 'approval:phase_ii',
@@ -143,7 +153,8 @@ const SUBMISSION_STATUS = {
   SUBMITTED: 'SUBMITTED',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
-  REVISION_REQUESTED: 'REVISION_REQUESTED'
+  REVISION_REQUESTED: 'REVISION_REQUESTED',
+  RESUBMITTED: 'RESUBMITTED'
 };
 
 // Phase II Status
@@ -154,14 +165,23 @@ const PHASE_II_STATUS = {
   OVERDUE: 'OVERDUE'
 };
 
-// Approval Levels
+// Approval Levels - Sequential Hierarchy
 const APPROVAL_LEVELS = {
   MENTOR: 'MENTOR',
-  ADVISOR: 'ADVISOR',
-  HOD: 'HOD',
+  CLASS_ADVISOR: 'CLASS_ADVISOR',
   INNOVATION_COORDINATOR: 'INNOVATION_COORDINATOR',
-  SUPER_ADMIN: 'SUPER_ADMIN'
+  HOD: 'HOD',
+  PRINCIPAL: 'PRINCIPAL'
 };
+
+// Approval Stage Sequence
+const APPROVAL_SEQUENCE = [
+  'MENTOR',
+  'CLASS_ADVISOR',
+  'INNOVATION_COORDINATOR',
+  'HOD',
+  'PRINCIPAL'
+];
 
 // Event Types
 const EVENT_TYPES = {
@@ -195,13 +215,27 @@ const NOTIFICATION_TYPES = {
   REJECTION: 'REJECTION',
   REVISION: 'REVISION',
   REMINDER: 'REMINDER',
-  GENERAL: 'GENERAL'
+  GENERAL: 'GENERAL',
+  MENTOR_SELECTED: 'MENTOR_SELECTED',
+  MENTOR_ACCEPTED: 'MENTOR_ACCEPTED',
+  MENTOR_REJECTED: 'MENTOR_REJECTED',
+  STAGE_APPROVED: 'STAGE_APPROVED',
+  STAGE_REJECTED: 'STAGE_REJECTED',
+  PROOF_SUBMITTED: 'PROOF_SUBMITTED',
+  EVENT_ARCHIVED: 'EVENT_ARCHIVED',
+  RESUBMITTED: 'RESUBMITTED'
 };
 
 // File Upload Limits
 const FILE_LIMITS = {
   MAX_SIZE: process.env.MAX_FILE_SIZE || 5242880, // 5MB
-  ALLOWED_TYPES: ['image/jpeg', 'image/png', 'application/pdf']
+  ALLOWED_TYPES: [
+    'image/jpeg',
+    'image/png',
+    'application/pdf',
+    'application/vnd.ms-excel', // .xls
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // .xlsx
+  ]
 };
 
 // Pagination
@@ -213,11 +247,13 @@ const PAGINATION = {
 
 module.exports = {
   ROLES,
+  FACULTY_ROLES,
   PERMISSIONS,
   ROLE_PERMISSIONS,
   SUBMISSION_STATUS,
   PHASE_II_STATUS,
   APPROVAL_LEVELS,
+  APPROVAL_SEQUENCE,
   EVENT_TYPES,
   EVENT_VISIBILITY,
   PARTICIPATION_TYPES,
@@ -225,3 +261,4 @@ module.exports = {
   FILE_LIMITS,
   PAGINATION
 };
+

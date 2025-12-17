@@ -1,5 +1,7 @@
 const PhaseIISubmission = require('../models/PhaseIISubmission');
 const PhaseISubmission = require('../models/PhaseISubmission');
+const Event = require('../models/Event');
+const { notifySubmissionCreated, notifyApprovalStatus, getApprovalProgress } = require('../services/notification.service');
 
 // Get all Phase II submissions
 exports.getAllPhaseIISubmissions = async (req, res, next) => {
@@ -12,19 +14,56 @@ exports.getAllPhaseIISubmissions = async (req, res, next) => {
     if (studentId) filter.studentId = studentId;
     
     // Filter based on role
-    // SUPER_ADMIN and HOD can see all submissions
     if (req.user.role === 'STUDENT') {
       const Student = require('../models/Student');
       const student = await Student.findOne({ userId: req.user._id });
       if (student) {
         filter.studentId = student._id;
       }
+    } else if (req.user.role === 'FACULTY') {
+      // For FACULTY role: check if class advisor or innovation coordinator
+      const Faculty = require('../models/Faculty');
+      const faculty = await Faculty.findOne({ userId: req.user._id });
+      if (!faculty) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Faculty record not found',
+        });
+      }
+      
+      // Class Advisors can only see their assigned students' submissions
+      if (faculty.isClassAdvisor) {
+        // Get all students advised by this faculty
+        const Student = require('../models/Student');
+        const advisedStudents = await Student.find({ advisorId: faculty._id }).select('_id');
+        const studentIds = advisedStudents.map(s => s._id);
+        filter.studentId = { $in: studentIds };
+      }
+      // Innovation Coordinators see all department submissions
+      else if (faculty.isInnovationCoordinator) {
+        filter.departmentId = faculty.departmentId;
+      } else {
+        // Faculty without specific role cannot see submissions
+        return res.status(403).json({
+          status: 'error',
+          message: 'You do not have permission to view submissions',
+        });
+      }
+    } else if (req.user.role === 'HOD') {
+      // HOD can see all submissions from their department
+      const Faculty = require('../models/Faculty');
+      const faculty = await Faculty.findOne({ userId: req.user._id });
+      if (faculty) {
+        filter.departmentId = faculty.departmentId;
+      }
     }
+    // SUPER_ADMIN can see all submissions (no filter)
     
     const submissions = await PhaseIISubmission.find(filter)
       .populate('eventId', 'title eventType')
       .populate('studentId', 'userId registerNumber')
       .populate('phaseISubmissionId')
+      .populate('approvedBy', 'firstName lastName')
       .sort({ submittedAt: -1 });
     
     res.json({
@@ -53,6 +92,14 @@ exports.createPhaseIISubmission = async (req, res, next) => {
       .populate('eventId', 'title')
       .populate('studentId', 'userId registerNumber');
     
+    // Get event and student details for notification
+    const event = await Event.findById(submission.eventId);
+    const Student = require('../models/Student');
+    const student = await Student.findById(submission.studentId).populate('userId');
+    
+    // Notify approvers about new submission
+    await notifySubmissionCreated(submission, event, student, event.departmentId);
+    
     res.status(201).json({
       status: 'success',
       data: { submission: populatedSubmission },
@@ -78,9 +125,12 @@ exports.getPhaseIISubmissionById = async (req, res, next) => {
       });
     }
     
+    // Get approval progress for students
+    const approvalProgress = await getApprovalProgress(submission);
+    
     res.json({
       status: 'success',
-      data: { submission },
+      data: { submission, approvalProgress },
     });
   } catch (error) {
     next(error);
@@ -92,7 +142,34 @@ exports.updatePhaseIIStatus = async (req, res, next) => {
   try {
     const { status, remarks } = req.body;
     
-    const submission = await PhaseIISubmission.findByIdAndUpdate(
+    const submission = await PhaseIISubmission.findById(req.params.id)
+      .populate('studentId');
+    
+    if (!submission) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Submission not found',
+      });
+    }
+    
+    // Authorization check: Only class advisor of the student can approve
+    if (req.user.role === 'FACULTY') {
+      const Faculty = require('../models/Faculty');
+      const faculty = await Faculty.findOne({ userId: req.user._id });
+      
+      // Class advisor can only approve their assigned students
+      if (faculty.isClassAdvisor) {
+        const student = submission.studentId;
+        if (!student.advisorId || student.advisorId.toString() !== faculty._id.toString()) {
+          return res.status(403).json({
+            status: 'error',
+            message: 'You can only approve submissions from your assigned students',
+          });
+        }
+      }
+    }
+    
+    const updatedSubmission = await PhaseIISubmission.findByIdAndUpdate(
       req.params.id,
       {
         status,
@@ -104,16 +181,14 @@ exports.updatePhaseIIStatus = async (req, res, next) => {
     ).populate('eventId', 'title')
      .populate('studentId', 'userId');
     
-    if (!submission) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Submission not found',
-      });
+    // Notify student about approval status
+    if (status === 'APPROVED' || status === 'REJECTED') {
+      await notifyApprovalStatus(updatedSubmission, status, updatedSubmission.studentId, updatedSubmission.eventId);
     }
     
     res.json({
       status: 'success',
-      data: { submission },
+      data: { submission: updatedSubmission },
       message: `Submission ${status.toLowerCase()} successfully`,
     });
   } catch (error) {

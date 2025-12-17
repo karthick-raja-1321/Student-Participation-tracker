@@ -19,7 +19,7 @@ const eventSchema = new mongoose.Schema({
   visibility: {
     type: String,
     enum: Object.values(EVENT_VISIBILITY),
-    default: EVENT_VISIBILITY.DEPARTMENT
+    default: EVENT_VISIBILITY.INSTITUTION
   },
   departmentId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -114,6 +114,22 @@ const eventSchema = new mongoose.Schema({
   isDeleted: {
     type: Boolean,
     default: false
+  },
+  // Auto-archiving
+  isArchived: {
+    type: Boolean,
+    default: false
+  },
+  archivedAt: Date,
+  archivedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  // Status tracking
+  status: {
+    type: String,
+    enum: ['DRAFT', 'PUBLISHED', 'ONGOING', 'COMPLETED', 'ARCHIVED'],
+    default: 'DRAFT'
   }
 }, {
   timestamps: true
@@ -126,11 +142,10 @@ eventSchema.index({ isPublished: 1 });
 eventSchema.index({ eventType: 1 });
 
 // Validation: endDate must be after startDate
-eventSchema.pre('save', function(next) {
+eventSchema.pre('save', function() {
   if (this.endDate < this.startDate) {
-    return next(new Error('End date must be after start date'));
+    throw new Error('End date must be after start date');
   }
-  next();
 });
 
 module.exports = mongoose.model('Event', eventSchema);

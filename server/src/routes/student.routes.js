@@ -7,6 +7,9 @@ const studentController = require('../controllers/student.controller');
 
 router.get('/', protect, studentController.getAllStudents);
 
+// Get current logged-in student profile
+router.get('/me', protect, studentController.getCurrentStudent);
+
 // Student dashboard and tracking routes (specific routes before :id)
 router.get('/dashboard/:studentId', protect, studentController.getStudentDashboard);
 router.get('/submissions/:submissionId/tracking', protect, studentController.getSubmissionTracking);

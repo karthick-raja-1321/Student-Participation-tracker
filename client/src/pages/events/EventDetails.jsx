@@ -71,6 +71,36 @@ const EventDetails = () => {
     });
   };
 
+  const handleRegisterForEvent = async () => {
+    try {
+      // Call API to register (will check for duplicate registration)
+      const response = await api.post(`/events/${id}/register`);
+      toast.success('Successfully registered for the event!');
+      
+      // Redirect to registration link if it exists
+      if (event.registrationLink) {
+        setTimeout(() => {
+          window.open(event.registrationLink, '_blank');
+        }, 500);
+      }
+      
+      // Refresh event data to show updated count
+      fetchEventDetails();
+    } catch (error) {
+      if (error.response?.status === 409) {
+        toast.warning('You are already registered for this event');
+        // Still redirect to registration link even if already registered
+        if (event.registrationLink) {
+          setTimeout(() => {
+            window.open(event.registrationLink, '_blank');
+          }, 500);
+        }
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to register for event');
+      }
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -285,11 +315,7 @@ const EventDetails = () => {
             <Button
               variant="contained"
               color="primary"
-              onClick={() => {
-                // Dummy Google Form URL for registration
-                const registrationURL = 'https://forms.google.com/u/0/forms/d/e/1FAIpQLSeExample/viewform';
-                window.open(registrationURL, '_blank');
-              }}
+              onClick={handleRegisterForEvent}
             >
               Register for Event
             </Button>

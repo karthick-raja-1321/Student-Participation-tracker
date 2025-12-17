@@ -322,68 +322,87 @@ const Students = () => {
         </Grid>
       </Paper>
 
-      <TableContainer component={Paper}>
-        <Table>
+      <TableContainer component={Paper} sx={{ maxHeight: '70vh' }}>
+        <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox">
+              <TableCell padding="checkbox" sx={{ backgroundColor: '#f5f5f5', width: '40px' }}>
                 <Checkbox
                   indeterminate={selected.length > 0 && selected.length < students.length}
                   checked={students.length > 0 && selected.length === students.length}
                   onChange={handleSelectAll}
                 />
               </TableCell>
-              <TableCell>Roll Number</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Phone</TableCell>
-              <TableCell>Year</TableCell>
-              <TableCell>Section</TableCell>
-              <TableCell>CGPA</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell sx={{ backgroundColor: '#f5f5f5', width: '90px', fontSize: '0.875rem' }}>Roll Number</TableCell>
+              <TableCell sx={{ backgroundColor: '#f5f5f5', width: '120px', fontSize: '0.875rem' }}>Name</TableCell>
+              <TableCell sx={{ backgroundColor: '#f5f5f5', width: '140px', fontSize: '0.875rem' }}>Email</TableCell>
+              <TableCell sx={{ backgroundColor: '#f5f5f5', width: '100px', fontSize: '0.875rem' }}>Phone</TableCell>
+              <TableCell sx={{ backgroundColor: '#f5f5f5', width: '50px', textAlign: 'center', fontSize: '0.875rem' }}>Year</TableCell>
+              <TableCell sx={{ backgroundColor: '#f5f5f5', width: '60px', textAlign: 'center', fontSize: '0.875rem' }}>Section</TableCell>
+              <TableCell 
+                align="center" 
+                sx={{ 
+                  backgroundColor: '#f5f5f5', 
+                  width: '140px',
+                  fontSize: '0.875rem'
+                }}
+              >
+                Actions
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} align="center">
+                <TableCell colSpan={8} align="center">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : students.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} align="center">
+                <TableCell colSpan={8} align="center">
                   No students found
                 </TableCell>
               </TableRow>
             ) : (
               students.map((student) => (
-                <TableRow key={student._id} selected={selected.includes(student._id)}>
-                  <TableCell padding="checkbox">
+                <TableRow key={student._id} selected={selected.includes(student._id)} sx={{ '&:hover': { backgroundColor: '#f9f9f9' } }}>
+                  <TableCell padding="checkbox" sx={{ width: '40px' }}>
                     <Checkbox
                       checked={selected.includes(student._id)}
                       onChange={() => handleSelectOne(student._id)}
                     />
                   </TableCell>
-                  <TableCell>{student.rollNumber}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ width: '90px', fontSize: '0.875rem' }}>{student.rollNumber}</TableCell>
+                  <TableCell sx={{ width: '120px', fontSize: '0.875rem' }}>
                     {student.userId?.firstName} {student.userId?.lastName}
                   </TableCell>
-                  <TableCell>{student.userId?.email}</TableCell>
-                  <TableCell>{student.phone || 'N/A'}</TableCell>
-                  <TableCell>{student.year}</TableCell>
-                  <TableCell>{student.section}</TableCell>
-                  <TableCell>{student.cgpa?.toFixed(2) || 'N/A'}</TableCell>
-                  <TableCell align="right">
-                    <Button size="small" startIcon={<Edit />} onClick={() => handleOpenEdit(student)}>
+                  <TableCell sx={{ width: '140px', fontSize: '0.875rem' }}>{student.userId?.email}</TableCell>
+                  <TableCell sx={{ width: '100px', fontSize: '0.875rem' }}>{student.phone || 'N/A'}</TableCell>
+                  <TableCell sx={{ width: '50px', textAlign: 'center', fontSize: '0.875rem' }}>{student.year}</TableCell>
+                  <TableCell sx={{ width: '60px', textAlign: 'center', fontSize: '0.875rem' }}>{student.section}</TableCell>
+                  <TableCell 
+                    align="center"
+                    sx={{ 
+                      width: '140px',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    <Button 
+                      size="small" 
+                      variant="outlined"
+                      startIcon={<Edit />} 
+                      onClick={() => handleOpenEdit(student)}
+                      sx={{ mr: 0.5 }}
+                    >
                       Edit
                     </Button>
                     <Button 
                       size="small" 
+                      variant="outlined"
                       color="error" 
                       startIcon={<Delete />} 
                       onClick={() => handleDelete(student._id)}
-                      sx={{ ml: 1 }}
                     >
                       Delete
                     </Button>

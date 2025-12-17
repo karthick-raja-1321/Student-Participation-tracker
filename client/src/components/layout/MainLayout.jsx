@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -22,11 +22,17 @@ import {
   Logout,
   Person,
   Circle,
+  SwapHoriz,
+  Brightness4,
+  Brightness7,
 } from '@mui/icons-material';
 import Sidebar from './Sidebar';
+import RoleSwitch from '../RoleSwitch';
 import { logout } from '../../store/slices/authSlice';
 import { toast } from 'react-toastify';
 import api from '../../utils/api';
+import { ColorModeContext } from '../../App';
+import { useTheme } from '@mui/material/styles';
 
 const MainLayout = () => {
   const navigate = useNavigate();
@@ -35,8 +41,11 @@ const MainLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const [notifAnchorEl, setNotifAnchorEl] = useState(null);
+  const [roleSwitchOpen, setRoleSwitchOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const colorMode = useContext(ColorModeContext);
+  const theme = useTheme();
 
   useEffect(() => {
     fetchUnreadCount();
@@ -137,7 +146,16 @@ const MainLayout = () => {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+      <AppBar
+        position="fixed"
+        sx={{
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          background: '#1a237e',
+          color: '#fff',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          borderBottom: '1px solid rgba(255,255,255,0.12)'
+        }}
+      >
         <Toolbar>
           <IconButton
             color="inherit"
@@ -154,10 +172,13 @@ const MainLayout = () => {
               style={{ height: '40px', marginRight: '16px', objectFit: 'contain' }}
               onError={(e) => { e.target.style.display = 'none'; }}
             />
-            <Typography variant="h6" noWrap component="div">
+            <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 600 }}>
               Student Participation Tracker
             </Typography>
           </Box>
+          <IconButton color="inherit" onClick={colorMode.toggleColorMode} sx={{ mr: 1 }}>
+            {theme.palette.mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
+          </IconButton>
           <IconButton color="inherit" onClick={handleNotifOpen}>
             <Badge badgeContent={unreadCount} color="error">
               <Notifications />
@@ -245,6 +266,12 @@ const MainLayout = () => {
                 {user?.email}
               </Typography>
             </MenuItem>
+            <MenuItem disabled>
+              <Typography variant="caption" color={user?.isTestMode ? 'error.main' : 'text.secondary'}>
+                Role: <strong>{user?.isTestMode ? user?.simulatedRole : user?.role}</strong>
+                {user?.isTestMode && ' (TEST MODE)'}
+              </Typography>
+            </MenuItem>
             <Divider />
             <MenuItem onClick={handleProfile}>
               <ListItemIcon>
@@ -258,6 +285,20 @@ const MainLayout = () => {
               </ListItemIcon>
               Settings
             </MenuItem>
+            {user?.role === 'SUPER_ADMIN' && (
+              <>
+                <Divider />
+                <MenuItem onClick={() => {
+                  handleMenuClose();
+                  setRoleSwitchOpen(true);
+                }}>
+                  <ListItemIcon>
+                    <SwapHoriz fontSize="small" />
+                  </ListItemIcon>
+                  Switch Role (Admin)
+                </MenuItem>
+              </>
+            )}
             <Divider />
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>
@@ -282,6 +323,9 @@ const MainLayout = () => {
       >
         <Outlet />
       </Box>
+
+      {/* Role Switch Dialog */}
+      <RoleSwitch open={roleSwitchOpen} onClose={() => setRoleSwitchOpen(false)} />
     </Box>
   );
 };

@@ -23,9 +23,17 @@ router.put('/:id', protect, phaseIController.updatePhaseISubmission);
 router.delete('/:id', protect, phaseIController.deletePhaseISubmission);
 
 router.put('/:id/status', protect, hasPermission(
-  PERMISSIONS.APPROVAL_PHASE_I_MENTOR,
+  PERMISSIONS.APPROVAL_PHASE_I_INNOVATION_COORDINATOR,
   PERMISSIONS.APPROVAL_PHASE_I_ADVISOR,
   PERMISSIONS.APPROVAL_PHASE_I_HOD
 ), phaseIController.updatePhaseIStatus);
+
+router.post('/:id/advisor-approval', protect, phaseIController.advisorApproval);
+
+router.post('/:id/mentor-approval', protect, phaseIController.mentorApproval);
+
+router.post('/:id/innovation-coordinator-approval', protect, phaseIController.innovationCoordinatorApproval);
+
+router.post('/:id/hod-approval', protect, phaseIController.hodApproval);
 
 module.exports = router;

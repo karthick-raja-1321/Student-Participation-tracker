@@ -22,14 +22,21 @@ const facultySchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Class Advisor Information
   isClassAdvisor: {
     type: Boolean,
     default: false
   },
   advisorForClasses: [{
     year: Number,
-    section: String
+    section: String,
+    departmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Department'
+    }
   }],
+  
+  // Mentor Information (for Phase I submissions)
   isMentor: {
     type: Boolean,
     default: false
@@ -38,10 +45,16 @@ const facultySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Student'
   }],
+  
+  // Innovation Coordinator Information (for Phase II submissions)
   isInnovationCoordinator: {
     type: Boolean,
     default: false
   },
+  innovationCoordinatorFor: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department'
+  }],
   isActive: {
     type: Boolean,
     default: true

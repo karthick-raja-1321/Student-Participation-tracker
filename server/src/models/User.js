@@ -55,6 +55,20 @@ const userSchema = new mongoose.Schema({
   refreshToken: {
     type: String,
     select: false
+  },
+  // Super Admin Role Simulator
+  simulatedRole: {
+    type: String,
+    enum: [...Object.values(ROLES), null],
+    default: null
+  },
+  simulatedDepartmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department'
+  },
+  isTestMode: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

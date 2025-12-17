@@ -17,4 +17,9 @@ router.post('/refresh-token', authController.refreshToken);
 router.get('/me', protect, authController.getMe);
 router.put('/change-password', protect, validate(changePasswordSchema), authController.changePassword);
 
+// Role Switching Routes (SUPER_ADMIN only)
+router.get('/available-roles', protect, authController.getAvailableRoles);
+router.post('/switch-role', protect, authController.switchRole);
+router.post('/reset-role', protect, authController.resetRole);
+
 module.exports = router;

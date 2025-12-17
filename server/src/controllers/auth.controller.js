@@ -276,3 +276,145 @@ exports.resetPassword = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Switch role (Admin/SUPER_ADMIN only - for testing)
+// @route   POST /api/auth/switch-role
+// @access  Private
+exports.switchRole = async (req, res, next) => {
+  try {
+    const { targetRole, targetDepartmentId } = req.body;
+    const { ROLES } = require('../config/constants');
+
+    // Only SUPER_ADMIN can switch roles
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Only SUPER_ADMIN can switch roles'
+      });
+    }
+
+    // Validate target role
+    if (!Object.values(ROLES).includes(targetRole)) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Invalid role. Must be one of: ${Object.values(ROLES).join(', ')}`
+      });
+    }
+
+    // Validate department for non-SUPER_ADMIN roles
+    if (targetRole !== 'SUPER_ADMIN' && targetDepartmentId) {
+      const Department = require('../models/Department');
+      const dept = await Department.findById(targetDepartmentId);
+      if (!dept) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Department not found'
+        });
+      }
+    }
+
+    // Update user with simulated role
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        simulatedRole: targetRole,
+        simulatedDepartmentId: targetDepartmentId || null,
+        isTestMode: true
+      },
+      { new: true }
+    ).populate('departmentId simulatedDepartmentId', 'name code');
+
+    logger.info(`Role switched for user ${req.user.email}: ${req.user.role} → ${targetRole}`);
+
+    res.json({
+      status: 'success',
+      message: `Role switched to ${targetRole}`,
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          originalRole: user.role,
+          simulatedRole: user.simulatedRole,
+          isTestMode: user.isTestMode,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          departmentId: user.departmentId,
+          simulatedDepartmentId: user.simulatedDepartmentId
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset role to original
+// @route   POST /api/auth/reset-role
+// @access  Private
+exports.resetRole = async (req, res, next) => {
+  try {
+    // User can reset their own role
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        simulatedRole: null,
+        simulatedDepartmentId: null,
+        isTestMode: false
+      },
+      { new: true }
+    ).populate('departmentId', 'name code');
+
+    logger.info(`Role reset for user ${req.user.email}: back to ${user.role}`);
+
+    res.json({
+      status: 'success',
+      message: `Role reset to ${user.role}`,
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          departmentId: user.departmentId,
+          isTestMode: user.isTestMode
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get available roles for switching
+// @route   GET /api/auth/available-roles
+// @access  Private
+exports.getAvailableRoles = async (req, res, next) => {
+  try {
+    const { ROLES } = require('../config/constants');
+    const Department = require('../models/Department');
+
+    // Only SUPER_ADMIN can switch roles
+    if (req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Only SUPER_ADMIN can view available roles'
+      });
+    }
+
+    const departments = await Department.find({ isActive: true }).select('name code _id');
+
+    res.json({
+      status: 'success',
+      data: {
+        roles: Object.values(ROLES),
+        departments,
+        currentRole: req.user.role,
+        simulatedRole: req.user.simulatedRole,
+        isTestMode: req.user.isTestMode
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};

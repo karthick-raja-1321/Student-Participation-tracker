@@ -15,6 +15,7 @@ import EventDetails from '../pages/events/EventDetails';
 import EventAnalytics from '../pages/events/EventAnalytics';
 import Submissions from '../pages/submissions/Submissions';
 import PhaseISubmission from '../pages/submissions/PhaseISubmission';
+import PhaseISubmissionEdit from '../pages/submissions/PhaseISubmissionEdit';
 import PhaseIISubmission from '../pages/submissions/PhaseIISubmission';
 import Approvals from '../pages/approvals/Approvals';
 import Reports from '../pages/reports/Reports';
@@ -27,6 +28,11 @@ import ExcelImport from '../pages/excel/ExcelImport';
 import Notifications from '../pages/notifications/Notifications';
 import Settings from '../pages/Settings';
 import NotFound from '../pages/NotFound';
+import ClassAdvisorDashboard from '../pages/dashboards/ClassAdvisorDashboard';
+import InnovationCoordinatorDashboard from '../pages/dashboards/InnovationCoordinatorDashboard';
+import PrincipalDashboard from '../pages/dashboards/PrincipalDashboard';
+import Mentorship from '../pages/mentorship/Mentorship';
+import PhaseIApprovalDetail from '../pages/approvals/PhaseIApprovalDetail';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -90,9 +96,26 @@ const AppRoutes = () => {
         <Route path="events/:id" element={<EventDetails />} />
         <Route path="events/:eventId/analytics" element={<EventAnalytics />} />
         <Route path="submissions" element={<Submissions />} />
+        {/* On-Duty Process Routes */}
+        <Route path="on-duty/new" element={<PhaseISubmission />} />
+        <Route path="on-duty/:id" element={<PhaseISubmission />} />
+        {/* Event Participation Proof Routes */}
+        <Route path="participation-proof/new" element={<PhaseIISubmission />} />
+        <Route path="participation-proof/new/:id" element={<PhaseIISubmission />} />
+        <Route path="participation-proof/:id" element={<PhaseIISubmission />} />
+        {/* Legacy routes for backward compatibility */}
         <Route path="submissions/phase-i/new" element={<PhaseISubmission />} />
+          <Route path="submissions/phase-i/:id/edit" element={<PhaseISubmissionEdit />} />
+        <Route path="submissions/phase-i/:id" element={<PhaseISubmission />} />
         <Route path="submissions/phase-ii/new/:id" element={<PhaseIISubmission />} />
+        <Route path="submissions/phase-ii/:id" element={<PhaseIISubmission />} />
+        {/* Role-based Dashboards */}
+        <Route path="dashboard/class-advisor" element={<ClassAdvisorDashboard />} />
+        <Route path="dashboard/innovation-coordinator" element={<InnovationCoordinatorDashboard />} />
+        <Route path="dashboard/principal" element={<PrincipalDashboard />} />
+        <Route path="mentorship" element={<Mentorship />} />
         <Route path="approvals" element={<Approvals />} />
+        <Route path="approvals/phase-i/:id" element={<PhaseIApprovalDetail />} />
         <Route path="reports" element={<Reports />} />
         <Route path="students" element={<Students />} />
         <Route path="students/submissions/:submissionId/tracking" element={<SubmissionTracking />} />

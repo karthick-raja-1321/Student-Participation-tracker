@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   Paper,
   Typography,
@@ -16,45 +17,67 @@ import {
   InputLabel,
   Select,
   Chip,
+  Snackbar,
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { toast } from 'react-toastify';
 import api from '../../utils/api';
+import { autoSaveFormData, getAutoSavedFormData, clearAutoSavedFormData } from '../../utils/autoSave';
 
-const steps = ['Event Selection', 'Registration Details', 'Participation Info', 'Review & Submit'];
+const steps = ['Event Selection', 'Participation Details', 'Payment Information', 'Review & Submit'];
 
 const validationSchema = Yup.object({
   eventId: Yup.string().required('Event is required'),
-  registrationType: Yup.string().required('Registration type is required'),
-  teamName: Yup.string().when('registrationType', {
+  mentorId: Yup.string().required('Mentor is required'),
+  participationType: Yup.string().required('Participation type is required'),
+  teamName: Yup.string().when('participationType', {
     is: 'TEAM',
     then: (schema) => schema.required('Team name is required'),
   }),
-  teamMembers: Yup.array().when('registrationType', {
+  teamMembers: Yup.array().when('participationType', {
     is: 'TEAM',
     then: (schema) => schema.min(1, 'At least one team member required'),
   }),
-  participationType: Yup.string().required('Participation type is required'),
-  registrationFee: Yup.number().min(0, 'Fee must be positive'),
   paymentStatus: Yup.string().required('Payment status is required'),
-  transactionId: Yup.string().when('paymentStatus', {
-    is: 'PAID',
-    then: (schema) => schema.required('Transaction ID required for paid status'),
-  }),
+  paymentAmount: Yup.number().min(0, 'Amount must be positive'),
 });
 
 const PhaseISubmission = () => {
   const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
   const [activeStep, setActiveStep] = useState(0);
   const [events, setEvents] = useState([]);
   const [students, setStudents] = useState([]);
+  const [mentors, setMentors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentStudentId, setCurrentStudentId] = useState(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('');
+  const restoredRef = useRef(false);
+  const formId = 'on-duty-process-form';
 
   useEffect(() => {
+    // Only fetch current student if user is a STUDENT
+    if (user?.role === 'STUDENT') {
+      fetchCurrentStudent();
+    }
     fetchEvents();
     fetchStudents();
-  }, []);
+    fetchMentors();
+  }, [user]);
+
+  const fetchCurrentStudent = async () => {
+    try {
+      const response = await api.get('/students/me');
+      setCurrentStudentId(response.data.data._id);
+    } catch (err) {
+      // Silently handle - user may not be a student (e.g., HOD, Faculty, Admin)
+      // This is expected behavior for non-student users
+      if (err.response?.status !== 404) {
+        console.error('Error fetching current student:', err);
+      }
+    }
+  };
 
   const fetchEvents = async () => {
     try {
@@ -74,34 +97,108 @@ const PhaseISubmission = () => {
     }
   };
 
+  const fetchMentors = async () => {
+    try {
+      const response = await api.get('/faculty');
+      setMentors(response.data.data.faculty || []);
+    } catch (err) {
+      console.error('Failed to load faculty:', err);
+    }
+  };
+
   const formik = useFormik({
     initialValues: {
       eventId: '',
-      registrationType: 'INDIVIDUAL',
+      mentorId: '',
+      participationType: 'INDIVIDUAL',
       teamName: '',
       teamMembers: [],
-      participationType: 'OFFLINE',
-      registrationFee: 0,
-      paymentStatus: 'UNPAID',
-      transactionId: '',
-      registrationDate: new Date().toISOString().split('T')[0],
-      expectedParticipationDate: '',
+      paymentStatus: 'NOT_REQUIRED',
+      paymentAmount: 0,
     },
     validationSchema,
     onSubmit: async (values, { setSubmitting }) => {
       setLoading(true);
       try {
-        await api.post('/registrations', values);
-        toast.success('Phase I submission successful!');
+        // Include studentId from current logged-in student
+        const submissionData = {
+          ...values,
+          studentId: currentStudentId,
+        };
+        
+        if (!currentStudentId) {
+          toast.error('Student profile not found. Please refresh and try again.');
+          setLoading(false);
+          setSubmitting(false);
+          return;
+        }
+        
+        console.log('Submitting data:', submissionData);
+        const response = await api.post('/registrations', submissionData);
+        toast.success(response.data?.message || 'On-Duty Process submission successful!');
+        
+        // Clear auto-saved data on successful submission
+        clearAutoSavedFormData(formId);
+        
         navigate('/submissions');
       } catch (err) {
-        toast.error(err.response?.data?.message || 'Submission failed');
+        console.error('Submission error:', err.response?.data);
+        console.error('Full error:', err);
+        const errorMessage = err.response?.data?.message || 'Submission failed';
+        const errors = err.response?.data?.errors;
+        
+        if (errors && Array.isArray(errors)) {
+          errors.forEach(error => console.error('Validation error:', error));
+          toast.error(`Validation failed: ${errors.map(e => e.message || e).join(', ')}`);
+        } else {
+          toast.error(errorMessage);
+        }
       } finally {
         setLoading(false);
         setSubmitting(false);
       }
     },
   });
+
+  // Restore auto-saved data once on mount - happens after formik initialization
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    
+    const restoreData = async () => {
+      const savedData = getAutoSavedFormData(formId);
+      if (savedData) {
+        // Wait a tick to ensure formik is ready
+        await new Promise(resolve => setTimeout(resolve, 50));
+        formik.setValues({
+          eventId: savedData.eventId ?? '',
+          mentorId: savedData.mentorId ?? '',
+          participationType: savedData.participationType ?? 'INDIVIDUAL',
+          teamName: savedData.teamName ?? '',
+          teamMembers: savedData.teamMembers ?? [],
+          paymentStatus: savedData.paymentStatus ?? 'NOT_REQUIRED',
+          paymentAmount: savedData.paymentAmount ?? 0,
+        });
+        setAutoSaveStatus('restored');
+        setTimeout(() => setAutoSaveStatus(''), 3000);
+      }
+    };
+    
+    restoreData();
+  }, [formik]);
+
+  // Auto-save on form changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      autoSaveFormData(
+        formId,
+        formik.values,
+        () => setAutoSaveStatus('saved')
+      );
+    }, 2000);
+
+    return () => clearTimeout(timeoutId);
+  }, [formik.values]);
 
   const handleNext = () => {
     setActiveStep((prev) => prev + 1);
@@ -145,6 +242,25 @@ const PhaseISubmission = () => {
               InputLabelProps={{ shrink: true }}
               sx={{ mb: 2 }}
             />
+
+            <TextField
+              fullWidth
+              select
+              label="Select Mentor (Faculty)"
+              name="mentorId"
+              value={formik.values.mentorId}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              error={formik.touched.mentorId && Boolean(formik.errors.mentorId)}
+              helperText={formik.touched.mentorId && formik.errors.mentorId}
+              sx={{ mb: 2 }}
+            >
+              {mentors.map((mentor) => (
+                <MenuItem key={mentor._id} value={mentor._id}>
+                  {mentor.firstName} {mentor.lastName} - {mentor.employeeId || 'N/A'} - {mentor.departmentId?.name || 'Department'}
+                </MenuItem>
+              ))}
+            </TextField>
           </Box>
         );
 
@@ -154,20 +270,20 @@ const PhaseISubmission = () => {
             <TextField
               fullWidth
               select
-              label="Registration Type"
-              name="registrationType"
-              value={formik.values.registrationType}
+              label="Participation Type"
+              name="participationType"
+              value={formik.values.participationType}
               onChange={formik.handleChange}
               onBlur={formik.handleBlur}
-              error={formik.touched.registrationType && Boolean(formik.errors.registrationType)}
-              helperText={formik.touched.registrationType && formik.errors.registrationType}
+              error={formik.touched.participationType && Boolean(formik.errors.participationType)}
+              helperText={formik.touched.participationType && formik.errors.participationType}
               sx={{ mb: 2 }}
             >
               <MenuItem value="INDIVIDUAL">Individual</MenuItem>
               <MenuItem value="TEAM">Team</MenuItem>
             </TextField>
 
-            {formik.values.registrationType === 'TEAM' && (
+            {formik.values.participationType === 'TEAM' && (
               <>
                 <TextField
                   fullWidth
@@ -222,36 +338,6 @@ const PhaseISubmission = () => {
             <TextField
               fullWidth
               select
-              label="Participation Type"
-              name="participationType"
-              value={formik.values.participationType}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.participationType && Boolean(formik.errors.participationType)}
-              helperText={formik.touched.participationType && formik.errors.participationType}
-              sx={{ mb: 2 }}
-            >
-              <MenuItem value="OFFLINE">Offline</MenuItem>
-              <MenuItem value="ONLINE">Online</MenuItem>
-              <MenuItem value="HYBRID">Hybrid</MenuItem>
-            </TextField>
-
-            <TextField
-              fullWidth
-              type="number"
-              label="Registration Fee"
-              name="registrationFee"
-              value={formik.values.registrationFee}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.registrationFee && Boolean(formik.errors.registrationFee)}
-              helperText={formik.touched.registrationFee && formik.errors.registrationFee}
-              sx={{ mb: 2 }}
-            />
-
-            <TextField
-              fullWidth
-              select
               label="Payment Status"
               name="paymentStatus"
               value={formik.values.paymentStatus}
@@ -261,24 +347,24 @@ const PhaseISubmission = () => {
               helperText={formik.touched.paymentStatus && formik.errors.paymentStatus}
               sx={{ mb: 2 }}
             >
-              <MenuItem value="UNPAID">Unpaid</MenuItem>
+              <MenuItem value="NOT_REQUIRED">Not Required</MenuItem>
+              <MenuItem value="PENDING">Pending</MenuItem>
               <MenuItem value="PAID">Paid</MenuItem>
-              <MenuItem value="WAIVED">Waived</MenuItem>
             </TextField>
 
-            {formik.values.paymentStatus === 'PAID' && (
-              <TextField
-                fullWidth
-                label="Transaction ID"
-                name="transactionId"
-                value={formik.values.transactionId}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                error={formik.touched.transactionId && Boolean(formik.errors.transactionId)}
-                helperText={formik.touched.transactionId && formik.errors.transactionId}
-                sx={{ mb: 2 }}
-              />
-            )}
+            <TextField
+              fullWidth
+              type="number"
+              label="Payment Amount (₹)"
+              name="paymentAmount"
+              value={formik.values.paymentAmount}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              error={formik.touched.paymentAmount && Boolean(formik.errors.paymentAmount)}
+              helperText={formik.touched.paymentAmount && formik.errors.paymentAmount}
+              inputProps={{ min: 0 }}
+              sx={{ mb: 2 }}
+            />
           </Box>
         );
 
@@ -298,9 +384,9 @@ const PhaseISubmission = () => {
                 <strong>Event:</strong> {selectedEvent?.title || 'N/A'}
               </Typography>
               <Typography variant="body1">
-                <strong>Registration Type:</strong> {formik.values.registrationType}
+                <strong>Participation Type:</strong> {formik.values.participationType}
               </Typography>
-              {formik.values.registrationType === 'TEAM' && (
+              {formik.values.participationType === 'TEAM' && (
                 <>
                   <Typography variant="body1">
                     <strong>Team Name:</strong> {formik.values.teamName}
@@ -311,10 +397,7 @@ const PhaseISubmission = () => {
                 </>
               )}
               <Typography variant="body1">
-                <strong>Participation Type:</strong> {formik.values.participationType}
-              </Typography>
-              <Typography variant="body1">
-                <strong>Registration Fee:</strong> ₹{formik.values.registrationFee}
+                <strong>Payment Amount:</strong> ₹{formik.values.paymentAmount}
               </Typography>
               <Typography variant="body1">
                 <strong>Payment Status:</strong> {formik.values.paymentStatus}
@@ -330,12 +413,21 @@ const PhaseISubmission = () => {
 
   return (
     <Paper sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Phase I Submission
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Pre-Event Registration
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box>
+          <Typography variant="h4" gutterBottom>
+            On-Duty Process
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Pre-Event Registration & Approval
+          </Typography>
+        </Box>
+        {autoSaveStatus && (
+          <Typography variant="caption" sx={{ color: '#4caf50', fontWeight: 'bold' }}>
+            ✓ {autoSaveStatus === 'saved' ? 'Auto-saved' : 'Form restored from previous session'}
+          </Typography>
+        )}
+      </Box>
 
       <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
         {steps.map((label) => (
@@ -371,6 +463,13 @@ const PhaseISubmission = () => {
           </Box>
         </Box>
       </form>
+
+      <Snackbar
+        open={autoSaveStatus === 'saved'}
+        autoHideDuration={3000}
+        onClose={() => setAutoSaveStatus('')}
+        message="Form auto-saved"
+      />
     </Paper>
   );
 };

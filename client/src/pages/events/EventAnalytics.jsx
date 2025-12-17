@@ -89,12 +89,32 @@ const EventAnalytics = () => {
         api.get(`/events/${eventId}/not-participated?limit=1`)
       ]);
 
+      // Handle both response structures (with and without data wrapper)
+      const getTotal = (response) => {
+        // Check all possible locations for total
+        const total = response.data?.total || response.data?.data?.total || response.total || 0;
+        console.log('API Response structure:', response.data, 'Extracted total:', total);
+        return total;
+      };
+
+      const studentTotal = getTotal(studentsViewed);
+      const facultyTotal = getTotal(facultyViewed);
+      const registeredTotal = getTotal(registered);
+      const notPartTotal = getTotal(notParticipated);
+
+      console.log('Stats extracted:', { 
+        studentViews: studentTotal, 
+        facultyViews: facultyTotal, 
+        registrations: registeredTotal, 
+        notParticipated: notPartTotal 
+      });
+
       setStats({
-        studentViews: studentsViewed.data.total || 0,
-        facultyViews: facultyViewed.data.total || 0,
-        registrations: registered.data.total || 0,
-        notParticipated: notParticipated.data.total || 0,
-        totalViews: (studentsViewed.data.total || 0) + (facultyViewed.data.total || 0)
+        studentViews: studentTotal,
+        facultyViews: facultyTotal,
+        registrations: registeredTotal,
+        notParticipated: notPartTotal,
+        totalViews: studentTotal + facultyTotal
       });
     } catch (error) {
       console.error('Failed to fetch stats:', error);

@@ -88,9 +88,25 @@ const Submissions = () => {
 
   const handleViewSubmission = (submissionId) => {
     if (tabValue === 0) {
-      navigate(`/submissions/phase-i/${submissionId}`);
+      navigate(`/on-duty/${submissionId}`);
     } else {
-      navigate(`/submissions/phase-ii/${submissionId}`);
+      navigate(`/participation-proof/${submissionId}`);
+    }
+  };
+
+  const handleNewSubmission = () => {
+    if (tabValue === 0) {
+      navigate('/on-duty/new');
+    } else {
+      // For Phase II (Event Participation Proof), we need a Phase I submission ID
+      // Show alert if no Phase I submissions exist
+      if (phaseISubmissions.length === 0) {
+        toast.warning('Please create an On Duty Process submission first');
+        setTabValue(0);
+        return;
+      }
+      // Navigate to new Event Participation Proof without requiring ID yet
+      navigate('/participation-proof/new');
     }
   };
 
@@ -114,16 +130,16 @@ const Submissions = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => navigate('/submissions/phase-i/new')}
+          onClick={handleNewSubmission}
         >
-          New Submission
+          {tabValue === 0 ? 'New On Duty Process' : 'New Event Participation Proof'}
         </Button>
       </Box>
 
       <Paper>
         <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
-          <Tab label="Phase I Submissions" />
-          <Tab label="Phase II Submissions" />
+          <Tab label="On Duty Process" />
+          <Tab label="Event Participation Proof" />
         </Tabs>
 
         <Box sx={{ p: 2 }}>
@@ -133,7 +149,9 @@ const Submissions = () => {
               <TextField
                 fullWidth
                 placeholder="Search by event name..."
-                startAdornment={<Search sx={{ mr: 1, color: 'action.active' }} />}
+                InputProps={{
+                  startAdornment: <Search sx={{ mr: 1, color: 'action.active' }} />
+                }}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 size="small"
@@ -205,28 +223,29 @@ const Submissions = () => {
                           >
                             View
                           </Button>
-                          {!isStudent && (
-                            <>
-                              <Button
-                                size="small"
-                                color="primary"
-                                startIcon={<Edit />}
-                                onClick={() => navigate(`/submissions/phase-i/${submission._id}/edit`)}
-                                sx={{ ml: 1 }}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                size="small"
-                                color="error"
-                                startIcon={<Delete />}
-                                onClick={() => setDeleteConfirm({ id: submission._id, phase: 'I' })}
-                                sx={{ ml: 1 }}
-                              >
-                                Delete
-                              </Button>
-                            </>
-                          )}
+                          {/* Students: edit/delete before mentor decision; Staff: always */}
+                          {(isStudent && (!submission.mentorApproval || submission.mentorApproval.approved === null)) || !isStudent ? (
+                            <Button
+                              size="small"
+                              color="primary"
+                              startIcon={<Edit />}
+                              onClick={() => navigate(`/submissions/phase-i/${submission._id}/edit`)}
+                              sx={{ ml: 1 }}
+                            >
+                              Edit
+                            </Button>
+                          ) : null}
+                          {(isStudent && (!submission.mentorApproval || submission.mentorApproval.approved === null)) || !isStudent ? (
+                            <Button
+                              size="small"
+                              color="error"
+                              startIcon={<Delete />}
+                              onClick={() => setDeleteConfirm({ id: submission._id, phase: 'I' })}
+                              sx={{ ml: 1 }}
+                            >
+                              Delete
+                            </Button>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))
@@ -284,28 +303,29 @@ const Submissions = () => {
                           >
                             View
                           </Button>
-                          {!isStudent && (
-                            <>
-                              <Button
-                                size="small"
-                                color="primary"
-                                startIcon={<Edit />}
-                                onClick={() => navigate(`/submissions/phase-ii/${submission._id}/edit`)}
-                                sx={{ ml: 1 }}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                size="small"
-                                color="error"
-                                startIcon={<Delete />}
-                                onClick={() => setDeleteConfirm({ id: submission._id, phase: 'II' })}
-                                sx={{ ml: 1 }}
-                              >
-                                Delete
-                              </Button>
-                            </>
-                          )}
+                          {/* Students: edit/delete until finalized; Staff: always */}
+                          {(isStudent && submission.status !== 'APPROVED' && submission.status !== 'REJECTED') || !isStudent ? (
+                            <Button
+                              size="small"
+                              color="primary"
+                              startIcon={<Edit />}
+                              onClick={() => navigate(`/submissions/phase-ii/${submission._id}/edit`)}
+                              sx={{ ml: 1 }}
+                            >
+                              Edit
+                            </Button>
+                          ) : null}
+                          {(isStudent && submission.status !== 'APPROVED' && submission.status !== 'REJECTED') || !isStudent ? (
+                            <Button
+                              size="small"
+                              color="error"
+                              startIcon={<Delete />}
+                              onClick={() => setDeleteConfirm({ id: submission._id, phase: 'II' })}
+                              sx={{ ml: 1 }}
+                            >
+                              Delete
+                            </Button>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))

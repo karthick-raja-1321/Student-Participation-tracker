@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Paper,
@@ -12,21 +12,25 @@ import {
   FormControlLabel,
   Checkbox,
   Grid,
+  Snackbar,
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { toast } from 'react-toastify';
 import api from '../../utils/api';
+import { autoSaveFormData, getAutoSavedFormData, clearAutoSavedFormData } from '../../utils/autoSave';
 
 const validationSchema = Yup.object({
   phaseISubmissionId: Yup.string().required('Phase I submission is required'),
   actualParticipationDate: Yup.date().required('Participation date is required'),
-  result: Yup.string().required('Result is required'),
+  result: Yup.string()
+    .required('Result is required')
+    .oneOf(['PARTICIPATED', 'WINNER', 'RUNNER_UP', 'FINALIST'], 'Invalid result selected'),
   prizeWon: Yup.string(),
   prizeAmount: Yup.number().min(0, 'Prize amount must be positive'),
-  eventReport: Yup.string()
-    .required('Event report is required')
-    .min(100, 'Report must be at least 100 characters'),
+  certificate: Yup.mixed().required('Certificate is required'),
+  eventReport: Yup.mixed().required('Event report file is required'),
+  photoFiles: Yup.mixed(),
 });
 
 const PhaseIISubmission = () => {
@@ -34,18 +38,17 @@ const PhaseIISubmission = () => {
   const { id } = useParams();
   const [phaseISubmissions, setPhaseISubmissions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [certificates, setCertificates] = useState([]);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('');
+  const restoredRef = useRef(false);
+  const formId = 'event-participation-proof-form';
 
   useEffect(() => {
     fetchPhaseISubmissions();
-    if (id) {
-      formik.setFieldValue('phaseISubmissionId', id);
-    }
-  }, [id]);
+  }, []);
 
   const fetchPhaseISubmissions = async () => {
     try {
-      const response = await api.get('/phase-i');
+      const response = await api.get('/submissions/phase-i');
       setPhaseISubmissions(response.data.data.submissions || []);
     } catch (err) {
       console.error('Failed to load Phase I submissions:', err);
@@ -59,17 +62,14 @@ const PhaseIISubmission = () => {
       result: '',
       prizeWon: '',
       prizeAmount: 0,
-      eventReport: '',
-      certificateUrls: [],
-      photoUrls: [],
+      certificate: null,
+      eventReport: null,
+      photoFiles: null,
       geoLocation: {
         latitude: 0,
         longitude: 0,
         address: '',
       },
-      feedback: '',
-      learningOutcomes: '',
-      hasCertificate: false,
     },
     validationSchema,
     onSubmit: async (values, { setSubmitting }) => {
@@ -82,7 +82,11 @@ const PhaseIISubmission = () => {
         };
 
         await api.post('/phase-ii', payload);
-        toast.success('Phase II submission successful!');
+        toast.success('Event Participation Proof submission successful!');
+        
+        // Clear auto-saved data on successful submission
+        clearAutoSavedFormData(formId);
+        
         navigate('/submissions');
       } catch (err) {
         toast.error(err.response?.data?.message || 'Submission failed');
@@ -93,6 +97,41 @@ const PhaseIISubmission = () => {
     },
   });
 
+  // Restore auto-saved data once on mount
+  useEffect(() => {
+    if (restoredRef.current) return;
+    const savedData = getAutoSavedFormData(formId);
+    if (savedData) {
+      // Only restore phaseISubmissionId if it exists in the available submissions
+      const submissionExists = phaseISubmissions.some(
+        (sub) => sub._id === savedData.phaseISubmissionId
+      );
+      
+      const dataToRestore = {
+        ...savedData,
+        phaseISubmissionId: submissionExists ? savedData.phaseISubmissionId : (id || ''),
+      };
+      
+      formik.setValues((prev) => ({ ...prev, ...dataToRestore }));
+      setAutoSaveStatus('restored');
+      restoredRef.current = true;
+      setTimeout(() => setAutoSaveStatus(''), 3000);
+    }
+  }, [phaseISubmissions]);
+
+  // Auto-save on form changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      autoSaveFormData(
+        formId,
+        formik.values,
+        () => setAutoSaveStatus('saved')
+      );
+    }, 2000);
+
+    return () => clearTimeout(timeoutId);
+  }, [formik.values]);
+
   const handleFileUpload = (event, type) => {
     const files = Array.from(event.target.files);
     // In a real implementation, upload to server/S3
@@ -100,35 +139,23 @@ const PhaseIISubmission = () => {
     console.log('Files to upload:', files);
   };
 
-  const handleGetLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          formik.setFieldValue('geoLocation.latitude', position.coords.latitude);
-          formik.setFieldValue('geoLocation.longitude', position.coords.longitude);
-          formik.setFieldValue(
-            'geoLocation.address',
-            `Lat: ${position.coords.latitude}, Lng: ${position.coords.longitude}`
-          );
-          toast.success('Location captured!');
-        },
-        (error) => {
-          toast.error('Failed to get location');
-        }
-      );
-    } else {
-      toast.error('Geolocation not supported');
-    }
-  };
-
   return (
     <Paper sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Phase II Submission
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Post-Event Participation Report
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box>
+          <Typography variant="h4" gutterBottom>
+            Event Participation Proof
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Post-Event Participation Report & Proof of Participation
+          </Typography>
+        </Box>
+        {autoSaveStatus && (
+          <Typography variant="caption" sx={{ color: '#4caf50', fontWeight: 'bold' }}>
+            ✓ {autoSaveStatus === 'saved' ? 'Auto-saved' : 'Form restored from previous session'}
+          </Typography>
+        )}
+      </Box>
 
       <Alert severity="info" sx={{ mb: 3 }}>
         Complete this form within 14 days of event participation to avoid overdue status
@@ -150,6 +177,7 @@ const PhaseIISubmission = () => {
               }
               helperText={formik.touched.phaseISubmissionId && formik.errors.phaseISubmissionId}
             >
+              <MenuItem value="">-- Select Phase I Submission --</MenuItem>
               {phaseISubmissions.map((submission) => (
                 <MenuItem key={submission._id} value={submission._id}>
                   {submission.eventId?.title || 'Event'} - {submission.registrationType}
@@ -194,7 +222,6 @@ const PhaseIISubmission = () => {
               <MenuItem value="WINNER">Winner</MenuItem>
               <MenuItem value="RUNNER_UP">Runner Up</MenuItem>
               <MenuItem value="FINALIST">Finalist</MenuItem>
-              <MenuItem value="PARTICIPATION_CERTIFICATE">Participation Certificate</MenuItem>
             </TextField>
           </Grid>
 
@@ -224,116 +251,109 @@ const PhaseIISubmission = () => {
           </Grid>
 
           <Grid item xs={12}>
-            <TextField
-              fullWidth
-              multiline
-              rows={6}
-              label="Event Report"
-              name="eventReport"
-              value={formik.values.eventReport}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.eventReport && Boolean(formik.errors.eventReport)}
-              helperText={
-                (formik.touched.eventReport && formik.errors.eventReport) ||
-                `${formik.values.eventReport.length} characters (minimum 100)`
-              }
-              placeholder="Describe your experience, what you learned, and how it benefited you..."
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label="Learning Outcomes"
-              name="learningOutcomes"
-              value={formik.values.learningOutcomes}
-              onChange={formik.handleChange}
-              placeholder="What skills or knowledge did you gain from this event?"
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              label="Feedback"
-              name="feedback"
-              value={formik.values.feedback}
-              onChange={formik.handleChange}
-              placeholder="Any feedback about the event or suggestions for improvement?"
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formik.values.hasCertificate}
-                  onChange={formik.handleChange}
-                  name="hasCertificate"
-                />
-              }
-              label="I have received a certificate"
-            />
-          </Grid>
-
-          {formik.values.hasCertificate && (
-            <Grid item xs={12}>
-              <Typography variant="body2" gutterBottom>
-                Upload Certificate(s)
-              </Typography>
-              <Button variant="outlined" component="label">
-                Choose Files
-                <input
-                  type="file"
-                  hidden
-                  multiple
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  id="certificate-upload"
-                  name="certificateFiles"
-                  onChange={(e) => handleFileUpload(e, 'certificate')}
-                />
-              </Button>
+            <Typography variant="body2" gutterBottom>
+              Event Report <span style={{ color: 'red' }}>*</span>
+            </Typography>
+            <Button variant="outlined" component="label">
+              Choose Event Report File
+              <input
+                type="file"
+                hidden
+                accept=".pdf,.doc,.docx,.txt"
+                name="eventReport"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    formik.setFieldValue('eventReport', file);
+                  }
+                }}
+                onBlur={formik.handleBlur}
+              />
+            </Button>
+            {formik.values.eventReport && (
               <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                Accepted formats: PDF, JPG, PNG (Max 5MB each)
+                File: {formik.values.eventReport.name}
               </Typography>
-            </Grid>
-          )}
+            )}
+            {formik.touched.eventReport && formik.errors.eventReport && (
+              <Typography variant="caption" color="error" display="block" sx={{ mt: 1 }}>
+                {formik.errors.eventReport}
+              </Typography>
+            )}
+            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+              Accepted formats: PDF, DOC, DOCX, TXT (Max 5MB)
+            </Typography>
+          </Grid>
 
           <Grid item xs={12}>
             <Typography variant="body2" gutterBottom>
-              Upload Event Photos
+              Certificate <span style={{ color: 'red' }}>*</span>
             </Typography>
             <Button variant="outlined" component="label">
-              Choose Photos
+              Choose Certificate File
+              <input
+                type="file"
+                hidden
+                accept=".pdf,.jpg,.jpeg,.png"
+                name="certificate"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    formik.setFieldValue('certificate', file);
+                  }
+                }}
+                onBlur={formik.handleBlur}
+              />
+            </Button>
+            {formik.values.certificate && (
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                File: {formik.values.certificate.name}
+              </Typography>
+            )}
+            {formik.touched.certificate && formik.errors.certificate && (
+              <Typography variant="caption" color="error" display="block" sx={{ mt: 1 }}>
+                {formik.errors.certificate}
+              </Typography>
+            )}
+            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+              Accepted formats: PDF, JPG, PNG (Max 5MB)
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Typography variant="body2" gutterBottom>
+              Photos
+            </Typography>
+            <Button variant="outlined" component="label">
+              Choose Photo Files
               <input
                 type="file"
                 hidden
                 multiple
                 accept=".jpg,.jpeg,.png"
-                id="photo-upload"
                 name="photoFiles"
-                onChange={(e) => handleFileUpload(e, 'photo')}
+                onChange={(e) => {
+                  const files = e.target.files?.[0];
+                  if (files) {
+                    formik.setFieldValue('photoFiles', files);
+                  }
+                }}
+                onBlur={formik.handleBlur}
               />
             </Button>
-            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-              Upload photos from the event (with GPS metadata if possible)
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12}>
-            <Box display="flex" alignItems="center" gap={2}>
-              <Typography variant="body2">
-                Location: {formik.values.geoLocation.address || 'Not captured'}
+            {formik.values.photoFiles && (
+              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                File: {formik.values.photoFiles.name}
               </Typography>
-              <Button variant="outlined" size="small" onClick={handleGetLocation}>
-                Get Current Location
-              </Button>
-            </Box>
+            )}
+            {formik.touched.photoFiles && formik.errors.photoFiles && (
+              <Typography variant="caption" color="error" display="block" sx={{ mt: 1 }}>
+                {formik.errors.photoFiles}
+              </Typography>
+            )}
+            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+              Upload photos from the event (JPG, PNG formats, Max 5MB each)
+            </Typography>
           </Grid>
 
           <Grid item xs={12}>
@@ -345,12 +365,19 @@ const PhaseIISubmission = () => {
                 color="primary"
                 disabled={formik.isSubmitting || loading}
               >
-                {loading ? <CircularProgress size={24} /> : 'Submit Phase II'}
+                {loading ? <CircularProgress size={24} /> : 'Submit Participation Proof'}
               </Button>
             </Box>
           </Grid>
         </Grid>
       </form>
+
+      <Snackbar
+        open={autoSaveStatus === 'saved'}
+        autoHideDuration={3000}
+        onClose={() => setAutoSaveStatus('')}
+        message="Form auto-saved"
+      />
     </Paper>
   );
 };

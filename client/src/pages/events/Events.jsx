@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
@@ -36,6 +36,8 @@ const Events = () => {
   const [openEdit, setOpenEdit] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [departments, setDepartments] = useState([]);
+  const [customEventTypes, setCustomEventTypes] = useState([]);
+  const [newEventTypeInput, setNewEventTypeInput] = useState('');
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
@@ -43,6 +45,7 @@ const Events = () => {
     startDate: '',
     endDate: '',
     venue: '',
+    organizerName: '',
     eventLevel: '',
     maxParticipants: '',
     registrationLink: ''
@@ -53,15 +56,50 @@ const Events = () => {
   });
   const [selected, setSelected] = useState([]);
 
+  // Build dynamic list of event types from existing events + custom additions
+  const eventTypesFromData = useMemo(() => {
+    const types = new Set(events
+      .map(e => (e.eventType || '').toString().trim().toUpperCase())
+      .filter(Boolean));
+    return Array.from(types);
+  }, [events]);
+
+  const allEventTypes = useMemo(() => {
+    const merged = new Set([...eventTypesFromData, ...customEventTypes.map(t => t.toUpperCase())]);
+    return Array.from(merged).sort();
+  }, [eventTypesFromData, customEventTypes]);
+
+  const addNewEventType = () => {
+    const val = (newEventTypeInput || '').trim().toUpperCase();
+    if (!val) return;
+    if (!customEventTypes.map(t => t.toUpperCase()).includes(val)) {
+      setCustomEventTypes(prev => [...prev, val]);
+    }
+    setNewEventTypeInput('');
+  };
+
+  const handleAddTypeToForm = (type) => {
+    setEventForm({ ...eventForm, eventType: type });
+  };
+
   useEffect(() => {
     fetchEvents();
     fetchDepartments();
+    // Set up auto-refresh every 30 seconds
+    const interval = setInterval(fetchEvents, 30000);
+    return () => clearInterval(interval);
   }, [filters]);
 
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/events', { params: filters });
+      // Build query params - handle eventName search
+      const queryParams = { ...filters };
+      if (filters.eventName) {
+        queryParams.search = filters.eventName;
+        delete queryParams.eventName;
+      }
+      const response = await api.get('/events', { params: queryParams });
       setEvents(response.data.data.events || []);
     } catch (error) {
       toast.error('Failed to fetch events');
@@ -87,6 +125,7 @@ const Events = () => {
       startDate: '',
       endDate: '',
       venue: '',
+      organizerName: '',
       eventLevel: '',
       maxParticipants: '',
       registrationLink: ''
@@ -102,6 +141,7 @@ const Events = () => {
       startDate: new Date(event.startDate).toISOString().slice(0, 16),
       endDate: new Date(event.endDate).toISOString().slice(0, 16),
       venue: event.venue,
+      organizerName: event.organizerName || '',
       eventLevel: event.eventLevel || '',
       maxParticipants: event.maxParticipants?.toString() || '',
       registrationLink: event.registrationLink || ''
@@ -119,6 +159,7 @@ const Events = () => {
       startDate: '',
       endDate: '',
       venue: '',
+      organizerName: '',
       eventLevel: '',
       maxParticipants: '',
       registrationLink: ''
@@ -127,7 +168,7 @@ const Events = () => {
 
   const handleSubmitCreate = async () => {
     try {
-      const required = ['title', 'description', 'eventType', 'startDate', 'endDate', 'venue'];
+      const required = ['title', 'description', 'eventType', 'startDate', 'endDate', 'venue', 'organizerName'];
       for (const k of required) {
         if (!eventForm[k]) return toast.error(`Please fill ${k}`);
       }
@@ -148,7 +189,7 @@ const Events = () => {
 
   const handleSubmitEdit = async () => {
     try {
-      const required = ['title', 'description', 'eventType', 'startDate', 'endDate', 'venue'];
+      const required = ['title', 'description', 'eventType', 'startDate', 'endDate', 'venue', 'organizerName'];
       for (const k of required) {
         if (!eventForm[k]) return toast.error(`Please fill ${k}`);
       }
@@ -275,7 +316,16 @@ const Events = () => {
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              label="Search Event Name"
+              placeholder="Enter event name"
+              value={filters.eventName || ''}
+              onChange={(e) => setFilters({ ...filters, eventName: e.target.value })}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
             <TextField
               fullWidth
               select
@@ -284,14 +334,12 @@ const Events = () => {
               onChange={(e) => setFilters({ ...filters, eventType: e.target.value })}
             >
               <MenuItem value="">All Types</MenuItem>
-              <MenuItem value="HACKATHON">Hackathon</MenuItem>
-              <MenuItem value="WORKSHOP">Workshop</MenuItem>
-              <MenuItem value="SEMINAR">Seminar</MenuItem>
-              <MenuItem value="COMPETITION">Competition</MenuItem>
-              <MenuItem value="CONFERENCE">Conference</MenuItem>
+              {allEventTypes.map(type => (
+                <MenuItem key={type} value={type}>{type}</MenuItem>
+              ))}
             </TextField>
           </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={4}>
             <TextField
               fullWidth
               select
@@ -423,13 +471,33 @@ const Events = () => {
           <Box sx={{ display: 'grid', gap: 2, mt: 1 }}>
             <TextField label="Title" value={eventForm.title} onChange={(e)=>setEventForm({...eventForm, title:e.target.value})} required />
             <TextField label="Description" multiline rows={3} value={eventForm.description} onChange={(e)=>setEventForm({...eventForm, description:e.target.value})} required />
-            <TextField select label="Event Type" value={eventForm.eventType} onChange={(e)=>setEventForm({...eventForm, eventType:e.target.value})} required>
-              <MenuItem value="HACKATHON">Hackathon</MenuItem>
-              <MenuItem value="WORKSHOP">Workshop</MenuItem>
-              <MenuItem value="SEMINAR">Seminar</MenuItem>
-              <MenuItem value="COMPETITION">Competition</MenuItem>
-              <MenuItem value="CONFERENCE">Conference</MenuItem>
-            </TextField>
+            <Box>
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>Event Type</Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                {allEventTypes.map(type => (
+                  <Button
+                    key={type}
+                    size="small"
+                    variant={eventForm.eventType === type ? 'contained' : 'outlined'}
+                    onClick={() => handleAddTypeToForm(type)}
+                  >
+                    {type}
+                  </Button>
+                ))}
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <TextField
+                  size="small"
+                  placeholder="e.g., WEBINAR"
+                  value={newEventTypeInput}
+                  onChange={(e) => setNewEventTypeInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addNewEventType()}
+                  sx={{ flex: 1 }}
+                />
+                <Button size="small" variant="outlined" onClick={addNewEventType}>Add Type</Button>
+              </Box>
+            </Box>
+            <TextField label="Organizer Name" value={eventForm.organizerName} onChange={(e)=>setEventForm({...eventForm, organizerName:e.target.value})} required />
             <TextField label="Start Date" type="datetime-local" InputLabelProps={{ shrink: true }} value={eventForm.startDate} onChange={(e)=>setEventForm({...eventForm, startDate:e.target.value})} required />
             <TextField label="End Date" type="datetime-local" InputLabelProps={{ shrink: true }} value={eventForm.endDate} onChange={(e)=>setEventForm({...eventForm, endDate:e.target.value})} required />
             <TextField label="Venue" value={eventForm.venue} onChange={(e)=>setEventForm({...eventForm, venue:e.target.value})} required />
@@ -456,13 +524,33 @@ const Events = () => {
           <Box sx={{ display: 'grid', gap: 2, mt: 1 }}>
             <TextField label="Title" value={eventForm.title} onChange={(e)=>setEventForm({...eventForm, title:e.target.value})} required />
             <TextField label="Description" multiline rows={3} value={eventForm.description} onChange={(e)=>setEventForm({...eventForm, description:e.target.value})} required />
-            <TextField select label="Event Type" value={eventForm.eventType} onChange={(e)=>setEventForm({...eventForm, eventType:e.target.value})} required>
-              <MenuItem value="HACKATHON">Hackathon</MenuItem>
-              <MenuItem value="WORKSHOP">Workshop</MenuItem>
-              <MenuItem value="SEMINAR">Seminar</MenuItem>
-              <MenuItem value="COMPETITION">Competition</MenuItem>
-              <MenuItem value="CONFERENCE">Conference</MenuItem>
-            </TextField>
+            <Box>
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>Event Type</Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                {allEventTypes.map(type => (
+                  <Button
+                    key={type}
+                    size="small"
+                    variant={eventForm.eventType === type ? 'contained' : 'outlined'}
+                    onClick={() => handleAddTypeToForm(type)}
+                  >
+                    {type}
+                  </Button>
+                ))}
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <TextField
+                  size="small"
+                  placeholder="e.g., WEBINAR"
+                  value={newEventTypeInput}
+                  onChange={(e) => setNewEventTypeInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addNewEventType()}
+                  sx={{ flex: 1 }}
+                />
+                <Button size="small" variant="outlined" onClick={addNewEventType}>Add Type</Button>
+              </Box>
+            </Box>
+            <TextField label="Organizer Name" value={eventForm.organizerName} onChange={(e)=>setEventForm({...eventForm, organizerName:e.target.value})} required />
             <TextField label="Start Date" type="datetime-local" InputLabelProps={{ shrink: true }} value={eventForm.startDate} onChange={(e)=>setEventForm({...eventForm, startDate:e.target.value})} required />
             <TextField label="End Date" type="datetime-local" InputLabelProps={{ shrink: true }} value={eventForm.endDate} onChange={(e)=>setEventForm({...eventForm, endDate:e.target.value})} required />
             <TextField label="Venue" value={eventForm.venue} onChange={(e)=>setEventForm({...eventForm, venue:e.target.value})} required />

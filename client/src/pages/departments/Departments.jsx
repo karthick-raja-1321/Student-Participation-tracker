@@ -38,7 +38,7 @@ const Departments = () => {
   const fetchDepartments = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/departments');
+      const response = await api.get('/departments', { params: { includeInactive: true } });
       setDepartments(response.data.data.departments || []);
     } catch (error) {
       toast.error('Failed to fetch departments');
@@ -147,6 +147,20 @@ const Departments = () => {
       fetchDepartments();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete selected departments');
+    }
+  };
+
+  const handleToggleStatus = async (dept) => {
+    try {
+      const newStatus = !dept.isActive;
+      await api.put(`/departments/${dept._id}`, {
+        ...dept,
+        isActive: newStatus
+      });
+      toast.success(`Department status changed to ${newStatus ? 'Active' : 'Inactive'}`);
+      fetchDepartments();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update department status');
     }
   };
 
@@ -265,6 +279,8 @@ const Departments = () => {
                       label={dept.isActive ? 'Active' : 'Inactive'}
                       color={dept.isActive ? 'success' : 'default'}
                       size="small"
+                      onClick={() => handleToggleStatus(dept)}
+                      sx={{ cursor: 'pointer' }}
                     />
                   </TableCell>
                   <TableCell align="right">

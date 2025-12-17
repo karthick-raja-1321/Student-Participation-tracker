@@ -34,9 +34,10 @@ connectDB();
 
 // Middleware
 app.use(helmet());
+// Dev-friendly CORS: allow any origin while still permitting credentials; tighten in prod via CLIENT_URL
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', process.env.CLIENT_URL].filter(Boolean),
-  credentials: true
+  origin: (origin, callback) => callback(null, true),
+  credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

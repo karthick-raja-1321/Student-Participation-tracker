@@ -223,6 +223,8 @@ exports.importFaculty = async (req, res, next) => {
         const departmentCode = row.getCell(5).value?.toString().trim().toUpperCase();
         const designation = row.getCell(6).value?.toString().trim();
         const phone = row.getCell(7).value?.toString().trim();
+        const classAdvisorStr = row.getCell(8).value?.toString().trim(); // Format: "2 CSE A"
+        const isInnovationCoordinatorStr = row.getCell(9).value?.toString().trim().toUpperCase(); // "TRUE" or "FALSE"
 
         if (!employeeId || !firstName || !lastName || !email || !departmentCode) {
           results.errors.push({
@@ -280,11 +282,40 @@ exports.importFaculty = async (req, res, next) => {
           employeeId
         });
 
+        // Parse class advisor information (format: "2 CSE A")
+        let isClassAdvisor = false;
+        let advisorForClasses = [];
+        
+        if (classAdvisorStr && classAdvisorStr.toUpperCase() !== 'FALSE' && classAdvisorStr !== '') {
+          const parts = classAdvisorStr.split(' ');
+          if (parts.length >= 3) {
+            const year = parseInt(parts[0]);
+            const deptCode = parts[1].toUpperCase();
+            const section = parts[2].toUpperCase();
+            
+            if (!isNaN(year) && year > 0) {
+              isClassAdvisor = true;
+              advisorForClasses = [{
+                year,
+                section,
+                departmentId: department._id
+              }];
+            }
+          }
+        }
+
+        // Parse innovation coordinator flag
+        const isInnovationCoordinator = isInnovationCoordinatorStr === 'TRUE';
+
         await Faculty.create({
           userId: user._id,
           employeeId,
           departmentId: department._id,
-          designation: designation || 'Assistant Professor'
+          designation: designation || 'Assistant Professor',
+          isClassAdvisor,
+          advisorForClasses,
+          isInnovationCoordinator,
+          innovationCoordinatorFor: isInnovationCoordinator ? [department._id] : []
         });
 
         results.successful++;

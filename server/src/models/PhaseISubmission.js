@@ -17,6 +17,10 @@ const phaseISubmissionSchema = new mongoose.Schema({
     ref: 'Event',
     required: true
   },
+  departmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department'
+  },
   eventDetails: {
     eventName: {
       type: String,
@@ -57,16 +61,95 @@ const phaseISubmissionSchema = new mongoose.Schema({
     fileSize: Number,
     uploadedAt: Date
   },
-  advisorId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Faculty',
-    required: true
-  },
+  teamName: String,
+  teamMembers: [{
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Student'
+    },
+    rollNumber: String,
+    name: String
+  }],
   mentorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Faculty',
     required: true
   },
+  innovationCoordinatorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Faculty'
+  },
+  hodId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Faculty'
+  },
+  principalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  // Approval tracking with complete hierarchy
+  mentorApproval: {
+    approved: {
+      type: Boolean,
+      default: null
+    },
+    approvedAt: Date,
+    comments: String,
+    notifiedAt: Date
+  },
+  classAdvisorApproval: {
+    approved: {
+      type: Boolean,
+      default: null
+    },
+    approvedAt: Date,
+    comments: String,
+    notifiedAt: Date
+  },
+  innovationCoordinatorApproval: {
+    approved: {
+      type: Boolean,
+      default: null
+    },
+    approvedAt: Date,
+    comments: String,
+    notifiedAt: Date
+  },
+  hodApproval: {
+    approved: {
+      type: Boolean,
+      default: null
+    },
+    approvedAt: Date,
+    comments: String,
+    notifiedAt: Date
+  },
+  principalApproval: {
+    approved: {
+      type: Boolean,
+      default: null
+    },
+    approvedAt: Date,
+    comments: String,
+    notifiedAt: Date
+  },
+  // Current approval stage
+  currentApprovalStage: {
+    type: String,
+    enum: ['MENTOR', 'CLASS_ADVISOR', 'INNOVATION_COORDINATOR', 'HOD', 'PRINCIPAL', 'COMPLETED'],
+    default: 'MENTOR'
+  },
+  // Approval timeline for tracking
+  approvalTimeline: [{
+    stage: String,
+    action: String, // APPROVED, REJECTED, PENDING
+    actionBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    actionAt: Date,
+    comments: String
+  }],
   status: {
     type: String,
     enum: Object.values(SUBMISSION_STATUS),
@@ -86,5 +169,6 @@ phaseISubmissionSchema.index({ studentId: 1, eventId: 1 });
 phaseISubmissionSchema.index({ status: 1 });
 phaseISubmissionSchema.index({ advisorId: 1 });
 phaseISubmissionSchema.index({ mentorId: 1 });
+phaseISubmissionSchema.index({ departmentId: 1 });
 
 module.exports = mongoose.model('PhaseISubmission', phaseISubmissionSchema);

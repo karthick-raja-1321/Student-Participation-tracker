@@ -54,6 +54,8 @@ router.get('/templates/:type', protect, async (req, res) => {
           { header: 'Department Code', key: 'departmentCode', width: 15 },
           { header: 'Designation', key: 'designation', width: 20 },
           { header: 'Phone', key: 'phone', width: 15 },
+          { header: 'Class Advisor (e.g., "2 CSE A" or leave blank)', key: 'classAdvisor', width: 30 },
+          { header: 'Is Innovation Coordinator (TRUE/FALSE)', key: 'isInnovationCoordinator', width: 25 },
         ];
         sampleData = [
           {
@@ -64,6 +66,19 @@ router.get('/templates/:type', protect, async (req, res) => {
             departmentCode: 'CSE',
             designation: 'Assistant Professor',
             phone: '9876543210',
+            classAdvisor: '2 CSE A',
+            isInnovationCoordinator: 'FALSE',
+          },
+          {
+            employeeId: 'FAC002',
+            firstName: 'John',
+            lastName: 'Doe',
+            email: 'john.doe@example.com',
+            departmentCode: 'CSE',
+            designation: 'Associate Professor',
+            phone: '9876543211',
+            classAdvisor: '1 CSE B',
+            isInnovationCoordinator: 'TRUE',
           },
         ];
         break;
