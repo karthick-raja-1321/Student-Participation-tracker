@@ -1,8 +1,14 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+// Use IP address for other devices, localhost for development
+const apiUrl = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? 'http://192.168.0.171:5000/api' 
+    : 'http://localhost:5000/api');
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: apiUrl,
   headers: {
     'Content-Type': 'application/json',
   },
