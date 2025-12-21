@@ -1,11 +1,24 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-// Use Render backend in production, localhost for development
-const apiUrl = import.meta.env.VITE_API_URL || 
-  (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-    ? 'http://localhost:5000/api' 
-    : 'https://student-participation-tracker.onrender.com/api');
+// Determine API URL based on environment
+const getApiUrl = () => {
+  // If VITE_API_URL is explicitly set, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // For localhost development, use local backend
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return 'http://localhost:5000/api';
+  }
+  
+  // For production (Netlify), use Render backend
+  return 'https://student-participation-tracker.onrender.com/api';
+};
+
+const apiUrl = getApiUrl();
+console.log('API URL:', apiUrl); // Debug log to verify URL
 
 const api = axios.create({
   baseURL: apiUrl,
