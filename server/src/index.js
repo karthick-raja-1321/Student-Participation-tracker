@@ -43,6 +43,11 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 
+// Root ping (useful for Render /)
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Backend is running', api: '/api', health: '/health' });
+});
+
 // Health check route
 app.get('/health', (req, res) => {
   res.status(200).json({
