@@ -3,16 +3,29 @@ import { toast } from 'react-toastify';
 
 // Determine API URL based on environment
 const getApiUrl = () => {
-  // If VITE_API_URL is explicitly set, use it
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+  // Prefer explicit VITE_API_URL, but avoid localhost in production
+  const explicit = import.meta.env.VITE_API_URL;
+  if (explicit) {
+    try {
+      const u = new URL(explicit);
+      const isLocalTarget = ['localhost', '127.0.0.1'].includes(u.hostname);
+      const isLocalHost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+      if (isLocalTarget && !isLocalHost) {
+        // Ignore localhost target when not running on localhost
+        // fall through to production default below
+      } else {
+        return explicit.endsWith('/api') ? explicit : `${explicit}/api`;
+      }
+    } catch {
+      // If explicit is not a valid URL, ignore and fall through
+    }
   }
-  
+
   // For localhost development, use local backend
   if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
     return 'http://localhost:5000/api';
   }
-  
+
   // For production (Netlify), use Render backend
   return 'https://student-participation-tracker.onrender.com/api';
 };
@@ -62,7 +75,7 @@ api.interceptors.response.use(
 
       try {
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/refresh-token`,
+          `${apiUrl}/auth/refresh-token`,
           { refreshToken }
         );
 

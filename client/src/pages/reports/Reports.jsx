@@ -36,7 +36,7 @@ const Reports = () => {
       const url = `/reports/export?${params.toString()}`;
       
       // Create a link and trigger download
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}${url}`, {
+      const response = await fetch(`${(await import('../../utils/api')).default.defaults.baseURL}${url}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -77,7 +77,7 @@ const Reports = () => {
       
       toast.info('Preparing report with submission proofs. This may take a while...');
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}${url}`, {
+      const response = await fetch(`${(await import('../../utils/api')).default.defaults.baseURL}${url}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

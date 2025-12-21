@@ -49,7 +49,7 @@ const ExcelImport = () => {
     try {
       toast.info('Downloading template...');
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/excel/templates/${importType}`, {
+      const response = await fetch(`${api.defaults.baseURL}/excel/templates/${importType}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
