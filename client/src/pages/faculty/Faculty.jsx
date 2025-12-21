@@ -178,6 +178,8 @@ const Faculty = () => {
           designation: form.designation,
           isClassAdvisor: form.isClassAdvisor,
           advisorForClasses,
+          isMentor: true,
+          menteeIds: [],
           isInnovationCoordinator: form.isInnovationCoordinator,
           innovationCoordinatorFor
         }
@@ -224,6 +226,8 @@ const Faculty = () => {
           designation: form.designation,
           isClassAdvisor: form.isClassAdvisor,
           advisorForClasses,
+          isMentor: true,
+          menteeIds: [],
           isInnovationCoordinator: form.isInnovationCoordinator,
           innovationCoordinatorFor
         }
