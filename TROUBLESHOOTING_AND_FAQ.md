@@ -338,6 +338,38 @@ netlify deploy --prod
 
 ---
 
+### Error 7: "400 Validation failed" on Excel Upload
+
+**Symptom:** Excel upload returns 400 with message "Validation failed: `faculty` is not a valid enum value for path `importType`".
+
+**Root Cause:**
+The ExcelImportLog model expects uppercase enum values (`FACULTY`, `STUDENTS`, `COMPLETED`, `PARTIAL`) but the code was using lowercase values (`faculty`, `students`, `completed`, `partial`).
+
+**Solution:**
+The code has been fixed locally. **Render deployment may be pending.** Options:
+
+1. **Force Render Redeploy:**
+   - Go to Render Dashboard
+   - Select Student Participation Tracker service
+   - Click "Manual Redeploy" or "Redeploy Latest"
+
+2. **Or wait for auto-deployment:**
+   - Ensure GitHub webhook is configured (Render → Settings → Git Integration)
+   - Service should auto-redeploy within 5-10 minutes of git push
+
+3. **Verify fix was deployed:**
+   ```bash
+   curl https://student-participation-tracker.onrender.com/api/excel/upload/faculty \
+     -X POST \
+     -H "Authorization: Bearer YOUR_TOKEN" \
+     -F "file=@test.xlsx"
+   ```
+   Should NOT return the enum validation error.
+
+**Status:** ✅ FIXED in code (commit b309a4f), pending Render deployment.
+
+---
+
 ## Frequently Asked Questions
 
 ### Q1: What are the valid test credentials?
