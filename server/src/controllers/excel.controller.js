@@ -156,14 +156,14 @@ exports.importStudents = async (req, res, next) => {
 
     // Create import log
     await ExcelImportLog.create({
-      importType: 'students',
+      importType: 'STUDENTS',
       fileName: req.file.originalname,
       uploadedBy: req.user._id,
       totalRows: results.total,
-      successfulRows: results.successful,
-      failedRows: results.failed,
+      successCount: results.successful,
+      failureCount: results.failed,
       errors: results.errors,
-      status: results.failed === 0 ? 'completed' : 'partial'
+      status: results.failed === 0 ? 'COMPLETED' : 'PARTIAL'
     });
 
     logger.info(`Student import completed: ${results.successful}/${results.total} successful`);
@@ -330,14 +330,14 @@ exports.importFaculty = async (req, res, next) => {
     }
 
     await ExcelImportLog.create({
-      importType: 'faculty',
+      importType: 'FACULTY',
       fileName: req.file.originalname,
       uploadedBy: req.user._id,
       totalRows: results.total,
-      successfulRows: results.successful,
-      failedRows: results.failed,
+      successCount: results.successful,
+      failureCount: results.failed,
       errors: results.errors,
-      status: results.failed === 0 ? 'completed' : 'partial'
+      status: results.failed === 0 ? 'COMPLETED' : 'PARTIAL'
     });
 
     logger.info(`Faculty import completed: ${results.successful}/${results.total} successful`);
