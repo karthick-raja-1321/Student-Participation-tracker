@@ -51,8 +51,9 @@ const Events = () => {
     registrationLink: ''
   });
   const [filters, setFilters] = useState({
+    eventName: '',
     eventType: '',
-    status: '',
+    status: '', // '', 'ONGOING', 'COMPLETED' per UI category requirements
   });
   const [selected, setSelected] = useState([]);
 
@@ -88,18 +89,13 @@ const Events = () => {
     // Set up auto-refresh every 30 seconds
     const interval = setInterval(fetchEvents, 30000);
     return () => clearInterval(interval);
-  }, [filters]);
+  }, []);
 
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      // Build query params - handle eventName search
-      const queryParams = { ...filters };
-      if (filters.eventName) {
-        queryParams.search = filters.eventName;
-        delete queryParams.eventName;
-      }
-      const response = await api.get('/events', { params: queryParams });
+      // Fetch all events, apply filters client-side for consistent UX
+      const response = await api.get('/events');
       setEvents(response.data.data.events || []);
     } catch (error) {
       toast.error('Failed to fetch events');
@@ -221,7 +217,7 @@ const Events = () => {
 
   const handleSelectAll = (event) => {
     if (event.target.checked) {
-      setSelected(events.map(e => e._id));
+      setSelected(filteredEvents.map(e => e._id));
     } else {
       setSelected([]);
     }
@@ -250,14 +246,14 @@ const Events = () => {
   };
 
   const handleDeleteFiltered = async () => {
-    if (events.length === 0) {
+    if (filteredEvents.length === 0) {
       toast.warning('No events match the current filters');
       return;
     }
-    if (!window.confirm(`Are you sure you want to delete all ${events.length} filtered event(s)?`)) return;
+    if (!window.confirm(`Are you sure you want to delete all ${filteredEvents.length} filtered event(s)?`)) return;
     try {
-      await Promise.all(events.map(e => api.delete(`/events/${e._id}`)));
-      toast.success(`${events.length} event(s) deleted successfully`);
+      await Promise.all(filteredEvents.map(e => api.delete(`/events/${e._id}`)));
+      toast.success(`${filteredEvents.length} event(s) deleted successfully`);
       setSelected([]);
       fetchEvents();
     } catch (err) {
@@ -275,6 +271,54 @@ const Events = () => {
     };
     return colors[status] || 'default';
   };
+
+  // Helpers to determine registration windows for category filtering
+  const isRegistrationOpen = (e) => {
+    const now = Date.now();
+    const deadline = e.registrationDeadline ? new Date(e.registrationDeadline).getTime() : null;
+    const end = e.endDate ? new Date(e.endDate).getTime() : null;
+    // Consider open if: explicit deadline in future OR event status is ONGOING OR start/end not passed yet
+    if (deadline && deadline >= now) return true;
+    if (e.status === 'ONGOING') return true;
+    // Fallback: before event end date
+    if (end && end >= now) return true;
+    return false;
+  };
+
+  const isRegistrationClosed = (e) => {
+    const now = Date.now();
+    const deadline = e.registrationDeadline ? new Date(e.registrationDeadline).getTime() : null;
+    const end = e.endDate ? new Date(e.endDate).getTime() : null;
+    if (e.status === 'COMPLETED' || e.status === 'CANCELLED') return true;
+    if (deadline && deadline < now) return true;
+    if (end && end < now) return true;
+    return false;
+  };
+
+  const filteredEvents = useMemo(() => {
+    let list = Array.isArray(events) ? [...events] : [];
+
+    // Name filter
+    if (filters.eventName?.trim()) {
+      const q = filters.eventName.trim().toLowerCase();
+      list = list.filter(e => (e.title || '').toLowerCase().includes(q));
+    }
+
+    // Type filter
+    if (filters.eventType) {
+      const t = filters.eventType.toUpperCase();
+      list = list.filter(e => (e.eventType || '').toString().trim().toUpperCase() === t);
+    }
+
+    // Status category filter per requirements
+    if (filters.status === 'ONGOING') {
+      list = list.filter(isRegistrationOpen);
+    } else if (filters.status === 'COMPLETED') {
+      list = list.filter(isRegistrationClosed);
+    }
+
+    return list;
+  }, [events, filters]);
 
   return (
     <Box>
@@ -299,9 +343,9 @@ const Events = () => {
               startIcon={<DeleteSweep />}
               onClick={handleDeleteFiltered}
               sx={{ mr: 1 }}
-              disabled={events.length === 0}
+              disabled={filteredEvents.length === 0}
             >
-              Delete All Filtered ({events.length})
+              Delete All Filtered ({filteredEvents.length})
             </Button>
             <Button
               variant="contained"
@@ -347,8 +391,7 @@ const Events = () => {
               value={filters.status}
               onChange={(e) => setFilters({ ...filters, status: e.target.value })}
             >
-              <MenuItem value="">All Status</MenuItem>
-              <MenuItem value="PUBLISHED">Published</MenuItem>
+              <MenuItem value="">All</MenuItem>
               <MenuItem value="ONGOING">Ongoing</MenuItem>
               <MenuItem value="COMPLETED">Completed</MenuItem>
             </TextField>
@@ -356,15 +399,15 @@ const Events = () => {
         </Grid>
       </Paper>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} sx={{ width: '100%', overflowX: 'auto' }}>
         <Table>
           <TableHead>
             <TableRow>
               {!isStudent && (
                 <TableCell padding="checkbox">
                   <Checkbox
-                    indeterminate={selected.length > 0 && selected.length < events.length}
-                    checked={events.length > 0 && selected.length === events.length}
+                    indeterminate={selected.length > 0 && selected.length < filteredEvents.length}
+                    checked={filteredEvents.length > 0 && selected.length === filteredEvents.length}
                     onChange={handleSelectAll}
                   />
                 </TableCell>
@@ -385,14 +428,14 @@ const Events = () => {
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : events.length === 0 ? (
+            ) : filteredEvents.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={isStudent ? 7 : 8} align="center">
-                  No events found
+                  No results found
                 </TableCell>
               </TableRow>
             ) : (
-              events.map((event) => (
+              filteredEvents.map((event) => (
                 <TableRow key={event._id} selected={!isStudent && selected.includes(event._id)}>
                   {!isStudent && (
                     <TableCell padding="checkbox">
