@@ -54,7 +54,13 @@ const Submissions = () => {
         setPhaseIISubmissions(response.data.data.submissions || []);
       }
     } catch (error) {
-      toast.error('Failed to fetch submissions');
+      // If staff opens the page and backend restricts student-only, avoid noisy errors
+      if (error.response?.status === 403) {
+        setPhaseISubmissions([]);
+        setPhaseIISubmissions([]);
+      } else {
+        toast.error('Failed to fetch submissions');
+      }
     } finally {
       setLoading(false);
     }
@@ -126,14 +132,16 @@ const Submissions = () => {
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4">My Submissions</Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={handleNewSubmission}
-        >
-          {tabValue === 0 ? 'New On Duty Process' : 'New Event Participation Proof'}
-        </Button>
+        <Typography variant="h4">{isStudent ? 'My Submissions' : 'Submissions'}</Typography>
+        {isStudent && (
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={handleNewSubmission}
+          >
+            {tabValue === 0 ? 'New On Duty Process' : 'New Event Participation Proof'}
+          </Button>
+        )}
       </Box>
 
       <Paper>
@@ -198,7 +206,7 @@ const Submissions = () => {
                   ) : phaseIFiltered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} align="center">
-                        {searchText || statusFilter ? 'No submissions match your filters' : 'No submissions found'}
+                        {searchText || statusFilter ? 'No submissions match your filters' : (isStudent ? 'No submissions found' : 'No student submissions to display')}
                       </TableCell>
                     </TableRow>
                   ) : (

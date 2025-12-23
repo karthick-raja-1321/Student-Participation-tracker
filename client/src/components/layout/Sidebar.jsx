@@ -39,7 +39,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
   const menuItems = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard', roles: ['SUPER_ADMIN', 'HOD', 'FACULTY', 'STUDENT'], color: '#1976d2' },
     { text: 'Events', icon: <Event />, path: '/events', roles: ['SUPER_ADMIN', 'HOD', 'FACULTY', 'STUDENT'], color: '#9c27b0' },
-    { text: 'Submissions', icon: <Assignment />, path: '/submissions', roles: ['SUPER_ADMIN', 'STUDENT'], color: '#f57c00' },
+    { text: 'Submissions', icon: <Assignment />, path: '/submissions', roles: ['SUPER_ADMIN', 'STUDENT', 'FACULTY', 'HOD'], color: '#f57c00' },
     { text: 'Mentorship', icon: <PersonSearch />, path: '/mentorship', roles: ['FACULTY'], color: '#00897b' },
     { text: 'Approvals', icon: <CheckCircle />, path: '/approvals', roles: ['SUPER_ADMIN', 'HOD', 'FACULTY'], color: '#388e3c' },
     { text: 'Reports', icon: <Assessment />, path: '/reports', roles: ['SUPER_ADMIN', 'HOD', 'FACULTY'], color: '#d32f2f' },
