@@ -56,6 +56,11 @@ const RoleSwitch = ({ open, onClose }) => {
     }
   };
 
+  const handleRefreshRoles = async () => {
+    await fetchAvailableRoles();
+    toast.info('Roles and departments refreshed');
+  };
+
   const handleSwitchRole = async () => {
     try {
       if (!selectedRole) {
@@ -222,6 +227,9 @@ const RoleSwitch = ({ open, onClose }) => {
                 🔄 <strong>How it works:</strong> When you switch roles, you'll see and interact with the system exactly as that role would.
                 Your original role ({currentRole}) is preserved and can be restored anytime.
               </Typography>
+              <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
+                Tip: If faculty roles were recently changed (e.g., Innovation Coordinator/Class Advisor), click <strong>Refresh Roles</strong> to re-sync access.
+              </Typography>
             </Alert>
           </>
         ) : (
@@ -242,6 +250,9 @@ const RoleSwitch = ({ open, onClose }) => {
             Reset to {currentRole}
           </Button>
         )}
+        <Button variant="text" onClick={handleRefreshRoles} disabled={loading || loadingRoles}>
+          Refresh Roles
+        </Button>
         <Button onClick={onClose} disabled={loading}>
           Close
         </Button>
