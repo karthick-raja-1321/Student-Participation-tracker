@@ -8,11 +8,25 @@ import {
 import { Event, People, Person, FilterList, EmojiEvents, Visibility } from '@mui/icons-material';
 import api from '../../utils/api';
 
+const academicYears = [
+  { label: '2024-2025', from: new Date('2024-06-01'), to: new Date('2025-05-31') },
+  { label: '2025-2026', from: new Date('2025-06-01'), to: new Date('2026-05-31') },
+];
+
 const PrincipalDashboard = () => {
   const { user } = useSelector((state) => state.auth);
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState([]);
-  const [filter, setFilter] = useState({ departmentId: 'all', year: 'all', section: 'all', status: 'all', eventScope: 'ALL' });
+  const [eventTypes, setEventTypes] = useState([]);
+  const [filter, setFilter] = useState({
+    departmentId: 'all',
+    year: 'all',
+    section: 'all',
+    status: 'all',
+    eventScope: 'ALL',
+    eventType: 'all',
+    academicYear: 'all',
+  });
   const [dashboardData, setDashboardData] = useState({
     section1: { totalEventsPosted: 0, totalStudents: 0, studentsWithZeroParticipation: 0 },
     section2: { totalSubmissions: 0, pendingApprovals: 0, approvedCount: 0, rejectedCount: 0 },
@@ -30,6 +44,11 @@ const PrincipalDashboard = () => {
         setLoading(true);
         const depsRes = await api.get('/departments');
         setDepartments(depsRes.data.data?.departments || []);
+        // Fetch event types
+        const eventsRes = await api.get('/events');
+        const allEvents = eventsRes.data.data?.events || [];
+        const types = Array.from(new Set(allEvents.map(e => (e.eventType || '').toLowerCase()).filter(Boolean)));
+        setEventTypes(['all', ...types]);
       } catch (e) {
         // ignore
       } finally {
@@ -82,6 +101,18 @@ const PrincipalDashboard = () => {
       }
       if (filter.status !== 'all') {
         phaseISubmissions = phaseISubmissions.filter(s => s.status === filter.status);
+      }
+      if (filter.eventType && filter.eventType !== 'all') {
+        events = events.filter(e => (e.eventType || '').toLowerCase() === filter.eventType);
+      }
+      if (filter.academicYear && filter.academicYear !== 'all') {
+        const yearObj = academicYears.find(y => y.label === filter.academicYear);
+        if (yearObj) {
+          events = events.filter(e => {
+            const start = e.startDate ? new Date(e.startDate) : null;
+            return start && start >= yearObj.from && start <= yearObj.to;
+          });
+        }
       }
 
       // Section 1
@@ -168,13 +199,13 @@ const PrincipalDashboard = () => {
         </Typography>
       </Box>
 
-      {/* Filters: Department, Year, Section */}
+      {/* Filters: Department, Year, Section, Event Type, Academic Year */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item>
             <FilterList />
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={2.4}>
             <FormControl fullWidth size="small">
               <InputLabel>Department</InputLabel>
               <Select value={filter.departmentId} label="Department" onChange={(e) => setFilter({ ...filter, departmentId: e.target.value })}>
@@ -185,7 +216,7 @@ const PrincipalDashboard = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={1.8}>
             <FormControl fullWidth size="small">
               <InputLabel>Year</InputLabel>
               <Select value={filter.year} label="Year" onChange={(e) => setFilter({ ...filter, year: e.target.value })}>
@@ -197,7 +228,7 @@ const PrincipalDashboard = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={1.8}>
             <FormControl fullWidth size="small">
               <InputLabel>Section</InputLabel>
               <Select value={filter.section} label="Section" onChange={(e) => setFilter({ ...filter, section: e.target.value })}>
@@ -208,7 +239,28 @@ const PrincipalDashboard = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Event Type</InputLabel>
+              <Select value={filter.eventType} label="Event Type" onChange={(e) => setFilter({ ...filter, eventType: e.target.value })}>
+                {eventTypes.map((type) => (
+                  <MenuItem key={type} value={type}>{type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Academic Year</InputLabel>
+              <Select value={filter.academicYear} label="Academic Year" onChange={(e) => setFilter({ ...filter, academicYear: e.target.value })}>
+                <MenuItem value="all">All Years</MenuItem>
+                {academicYears.map((y) => (
+                  <MenuItem key={y.label} value={y.label}>{y.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={2}>
             <FormControl fullWidth size="small">
               <InputLabel>Submission Status</InputLabel>
               <Select value={filter.status} label="Submission Status" onChange={(e) => setFilter({ ...filter, status: e.target.value })}>

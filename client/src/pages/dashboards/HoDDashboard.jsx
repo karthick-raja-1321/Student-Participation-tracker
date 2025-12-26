@@ -12,11 +12,23 @@ import {
 } from '@mui/icons-material';
 import api from '../../utils/api';
 
+const academicYears = [
+  { label: '2024-2025', from: new Date('2024-06-01'), to: new Date('2025-05-31') },
+  { label: '2025-2026', from: new Date('2025-06-01'), to: new Date('2026-05-31') },
+];
+
 const HoDDashboard = () => {
   const { user } = useSelector((state) => state.auth);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({ year: 'all', section: 'all', status: 'all' });
+  const [eventTypes, setEventTypes] = useState([]);
+  const [filter, setFilter] = useState({
+    year: 'all',
+    section: 'all',
+    status: 'all',
+    eventType: 'all',
+    academicYear: 'all',
+  });
   const [dashboardData, setDashboardData] = useState({
     section1: {
       totalEventsPosted: 0,
@@ -50,6 +62,19 @@ const HoDDashboard = () => {
     departmentNews: []
   });
 
+
+  useEffect(() => {
+    const fetchTypes = async () => {
+      try {
+        const eventsRes = await api.get(`/events?departmentId=${user.departmentId}`);
+        const allEvents = eventsRes.data.data?.events || [];
+        const types = Array.from(new Set(allEvents.map(e => (e.eventType || '').toLowerCase()).filter(Boolean)));
+        setEventTypes(['all', ...types]);
+      } catch {}
+    };
+    fetchTypes();
+  }, [user.departmentId]);
+
   useEffect(() => {
     fetchDashboardData();
     // Set up auto-refresh every 30 seconds
@@ -82,7 +107,22 @@ const HoDDashboard = () => {
       const phaseISubmissions = phaseIRes.data.data?.submissions || [];
       const phaseIISubmissions = phaseIIRes.data.data?.submissions || [];
 
+
       // Apply filters
+      let filteredEvents = events;
+      if (filter.eventType && filter.eventType !== 'all') {
+        filteredEvents = filteredEvents.filter(e => (e.eventType || '').toLowerCase() === filter.eventType);
+      }
+      if (filter.academicYear && filter.academicYear !== 'all') {
+        const yearObj = academicYears.find(y => y.label === filter.academicYear);
+        if (yearObj) {
+          filteredEvents = filteredEvents.filter(e => {
+            const start = e.startDate ? new Date(e.startDate) : null;
+            return start && start >= yearObj.from && start <= yearObj.to;
+          });
+        }
+      }
+
       const filteredStudents = students.filter(s => {
         if (filter.year !== 'all' && s.year !== parseInt(filter.year)) return false;
         if (filter.section !== 'all' && s.section !== filter.section) return false;
@@ -120,8 +160,8 @@ const HoDDashboard = () => {
       };
 
       // Section 3: Internal vs External
-      const internalEvents = events.filter(e => e.visibility === 'INSTITUTION' || e.visibility === 'DEPARTMENT');
-      const externalEvents = events.filter(e => e.visibility === 'EXTERNAL');
+      const internalEvents = filteredEvents.filter(e => e.visibility === 'INSTITUTION' || e.visibility === 'DEPARTMENT');
+      const externalEvents = filteredEvents.filter(e => e.visibility === 'EXTERNAL');
 
       const calculateEventStats = (eventList) => {
         const eventIds = eventList.map(e => e._id?.toString());
@@ -224,13 +264,13 @@ const HoDDashboard = () => {
         </Typography>
       </Box>
 
-      {/* Filters */}
+      {/* Filters: Year, Section, Status, Event Type, Academic Year */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item>
             <FilterList />
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={2.2}>
             <FormControl fullWidth size="small">
               <InputLabel>Year</InputLabel>
               <Select
@@ -246,7 +286,7 @@ const HoDDashboard = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={2.2}>
             <FormControl fullWidth size="small">
               <InputLabel>Section</InputLabel>
               <Select
@@ -261,7 +301,7 @@ const HoDDashboard = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={2.2}>
             <FormControl fullWidth size="small">
               <InputLabel>Status</InputLabel>
               <Select
@@ -273,6 +313,35 @@ const HoDDashboard = () => {
                 <MenuItem value="APPROVED">Approved</MenuItem>
                 <MenuItem value="REJECTED">Rejected</MenuItem>
                 <MenuItem value="SUBMITTED">Pending</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={2.2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Event Type</InputLabel>
+              <Select
+                value={filter.eventType}
+                label="Event Type"
+                onChange={(e) => setFilter({ ...filter, eventType: e.target.value })}
+              >
+                {eventTypes.map((type) => (
+                  <MenuItem key={type} value={type}>{type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={2.2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Academic Year</InputLabel>
+              <Select
+                value={filter.academicYear}
+                label="Academic Year"
+                onChange={(e) => setFilter({ ...filter, academicYear: e.target.value })}
+              >
+                <MenuItem value="all">All Years</MenuItem>
+                {academicYears.map((y) => (
+                  <MenuItem key={y.label} value={y.label}>{y.label}</MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Grid>

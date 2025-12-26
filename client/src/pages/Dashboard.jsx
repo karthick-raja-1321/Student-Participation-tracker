@@ -549,7 +549,11 @@ const Dashboard = () => {
                 <Typography variant="body2" sx={{ opacity: 0.9, mt: 1 }}>
                   Pending approvals waiting for your review
                 </Typography>
-                <Button variant="contained" sx={{ mt: 2, bgcolor: 'white', color: '#f5576c' }}>
+                <Button
+                  variant="contained"
+                  sx={{ mt: 2, bgcolor: 'white', color: '#f5576c' }}
+                  onClick={() => navigate('/approvals')}
+                >
                   Review Now
                 </Button>
               </Box>
@@ -920,20 +924,64 @@ const Dashboard = () => {
       { title: 'Total Students', value: dashboardData?.generalStats?.totalStudents.toString() || '0', icon: <School />, color: '#7B1FA2' },
     ];
 
+    // Event type filter for participation/prize stats
+    const [adminEventType, setAdminEventType] = useState('all');
     const eventsList = dashboardData?.rawData?.events || [];
     const studentsList = dashboardData?.rawData?.students || [];
+    const registrations = dashboardData?.rawData?.registrations || [];
+    const submissions = dashboardData?.rawData?.submissions || [];
+    const eventTypes = useMemo(() => {
+      const types = new Set();
+      eventsList.forEach(e => {
+        const t = (e?.eventType || '').toString().trim().toLowerCase();
+        if (t) types.add(t);
+      });
+      return ['all', ...Array.from(types)];
+    }, [eventsList]);
+
+    // Class-wise stats: { [classKey]: { studentsParticipated, prizeAmount } }
+    const classStats = useMemo(() => {
+      // Map: year-section => { students: Set, prizeAmount }
+      const stats = {};
+      // Filter events by type
+      const filteredEventIds = new Set(eventsList.filter(e => adminEventType === 'all' || (e.eventType || '').toLowerCase() === adminEventType).map(e => e._id?.toString()));
+      // Participation: students who registered for filtered events
+      registrations.forEach(r => {
+        if (!filteredEventIds.has(r.eventId?.toString())) return;
+        const stu = studentsList.find(s => s._id?.toString() === r.studentId?.toString());
+        if (!stu) return;
+        const classKey = `${stu.year || 'N/A'}-${stu.section || 'N/A'}`;
+        if (!stats[classKey]) stats[classKey] = { students: new Set(), prizeAmount: 0 };
+        stats[classKey].students.add(stu._id?.toString());
+      });
+      // Prize: sum prizeAmount for approved submissions in filtered events
+      submissions.forEach(s => {
+        if (!filteredEventIds.has(s.eventId?.toString())) return;
+        if (s.status !== 'APPROVED') return;
+        const stu = studentsList.find(stu => stu._id?.toString() === s.studentId?.toString());
+        if (!stu) return;
+        const classKey = `${stu.year || 'N/A'}-${stu.section || 'N/A'}`;
+        if (!stats[classKey]) stats[classKey] = { students: new Set(), prizeAmount: 0 };
+        stats[classKey].prizeAmount += Number(s?.prizeDetails?.prizeAmount || 0);
+      });
+      // Convert to array for table
+      return Object.entries(stats).map(([classKey, val]) => ({
+        classKey,
+        studentsParticipated: val.students.size,
+        prizeAmount: val.prizeAmount
+      })).sort((a, b) => a.classKey.localeCompare(b.classKey));
+    }, [adminEventType, eventsList, studentsList, registrations, submissions]);
+
+    // ...existing code for latestEvents, upcomingEvents, recentPrizeWinners...
     const studentById = new Map(studentsList.map(s => [s._id?.toString(), s]));
     const eventById = new Map(eventsList.map(e => [e._id?.toString(), e]));
-
     const safeDate = (d) => {
       const dt = d ? new Date(d) : null;
       return dt && !Number.isNaN(dt.getTime()) ? dt : null;
     };
-
     const latestEvents = [...eventsList]
       .sort((a, b) => (safeDate(b.createdAt || b.startDate) - safeDate(a.createdAt || a.startDate)))
       .slice(0, 5);
-
     const upcomingEvents = eventsList
       .filter(e => {
         const d = safeDate(e.startDate);
@@ -941,8 +989,7 @@ const Dashboard = () => {
       })
       .sort((a, b) => safeDate(a.startDate) - safeDate(b.startDate))
       .slice(0, 5);
-
-    const recentPrizeWinners = (dashboardData?.rawData?.submissions || [])
+    const recentPrizeWinners = (submissions || [])
       .filter(s => Number(s?.prizeDetails?.prizeAmount || 0) > 0 && s?.prizeDetails?.wonPrize && s?.status === 'APPROVED')
       .sort((a, b) => (safeDate(b.updatedAt || b.submittedAt || b.createdAt) - safeDate(a.updatedAt || a.submittedAt || a.createdAt)))
       .slice(0, 5)
@@ -986,8 +1033,46 @@ const Dashboard = () => {
           ))}
         </Grid>
 
+        {/* Event Type Filter and Class-wise Participation/Prize Table */}
+        <Paper sx={{ p: 3, mt: 3, mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Typography variant="h6">Participation & Prize by Class</Typography>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel>Event Type</InputLabel>
+              <Select value={adminEventType} label="Event Type" onChange={e => setAdminEventType(e.target.value)}>
+                {eventTypes.map(type => (
+                  <MenuItem key={type} value={type}>{type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+          <Box sx={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
+                  <th style={{ padding: '10px', textAlign: 'left', fontWeight: 'bold' }}>Class (Year-Section)</th>
+                  <th style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold' }}>Students Participated</th>
+                  <th style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold' }}>Total Prize Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {classStats.length === 0 ? (
+                  <tr><td colSpan="3" style={{ textAlign: 'center', color: '#888', padding: '12px' }}>No data for selected event type</td></tr>
+                ) : classStats.map(row => (
+                  <tr key={row.classKey} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '10px' }}>{row.classKey}</td>
+                    <td style={{ padding: '10px', textAlign: 'center' }}>{row.studentsParticipated}</td>
+                    <td style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold' }}>{row.prizeAmount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Box>
+        </Paper>
+
+        {/* ...existing code for analytics, star performers, command center, latest events, etc. ... */}
+        {/* Option 2: Real-Time Analytics */}
         <Grid container spacing={3} sx={{ mt: 2 }}>
-          {/* Option 2: Real-Time Analytics */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3, height: '100%', background: 'linear-gradient(135deg, #00d4ff 0%, #0099ff 100%)', color: 'white' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>

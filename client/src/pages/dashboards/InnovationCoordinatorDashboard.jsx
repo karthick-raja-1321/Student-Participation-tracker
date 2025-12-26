@@ -50,6 +50,11 @@ function TabPanel(props) {
   );
 }
 
+const academicYears = [
+  { label: '2024-2025', from: new Date('2024-06-01'), to: new Date('2025-05-31') },
+  { label: '2025-2026', from: new Date('2025-06-01'), to: new Date('2026-05-31') },
+];
+
 const InnovationCoordinatorDashboard = () => {
   const [stats, setStats] = useState({
     submissionsReviewing: 0,
@@ -58,6 +63,9 @@ const InnovationCoordinatorDashboard = () => {
     prizeAwards: 0,
     pastApprovals: 0,
   });
+  const [eventTypes, setEventTypes] = useState([]);
+  const [eventTypeFilter, setEventTypeFilter] = useState('all');
+  const [academicYearFilter, setAcademicYearFilter] = useState('all');
   const [phaseISubmissions, setPhaseISubmissions] = useState([]);
   const [phaseIISubmissions, setPhaseIISubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,11 +83,23 @@ const InnovationCoordinatorDashboard = () => {
   const [phaseIIStats, setPhaseIIStats] = useState({ total: 0, approved: 0, rejected: 0, underReview: 0 });
 
   useEffect(() => {
+    const fetchTypes = async () => {
+      try {
+        const eventsRes = await api.get('/events');
+        const allEvents = eventsRes.data.data?.events || [];
+        const types = Array.from(new Set(allEvents.map(e => (e.eventType || '').toLowerCase()).filter(Boolean)));
+        setEventTypes(['all', ...types]);
+      } catch {}
+    };
+    fetchTypes();
+  }, []);
+
+  useEffect(() => {
     fetchDashboardData();
     // Set up auto-refresh every 30 seconds
     const interval = setInterval(fetchDashboardData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [eventTypeFilter, academicYearFilter]);
 
   useEffect(() => {
     if (phaseISubmissions.length > 0 || phaseIISubmissions.length > 0) {
@@ -96,12 +116,33 @@ const InnovationCoordinatorDashboard = () => {
 
       // Fetch Phase I submissions
       const phaseIResponse = await api.get('/approvals/innovation-coordinator-phase-i');
-      const allPhaseI = phaseIResponse.data.data.submissions || [];
-      setPhaseISubmissions(allPhaseI);
+      let allPhaseI = phaseIResponse.data.data.submissions || [];
 
       // Fetch Phase II submissions
       const phaseIIResponse = await api.get('/approvals/innovation-coordinator-phase-ii');
-      const allPhaseII = phaseIIResponse.data.data.submissions || [];
+      let allPhaseII = phaseIIResponse.data.data.submissions || [];
+
+      // Filter by event type
+      if (eventTypeFilter && eventTypeFilter !== 'all') {
+        allPhaseI = allPhaseI.filter(s => (s.eventType || '').toLowerCase() === eventTypeFilter);
+        allPhaseII = allPhaseII.filter(s => (s.eventType || '').toLowerCase() === eventTypeFilter);
+      }
+      // Filter by academic year
+      if (academicYearFilter && academicYearFilter !== 'all') {
+        const yearObj = academicYears.find(y => y.label === academicYearFilter);
+        if (yearObj) {
+          allPhaseI = allPhaseI.filter(s => {
+            const start = s.eventStartDate ? new Date(s.eventStartDate) : null;
+            return start && start >= yearObj.from && start <= yearObj.to;
+          });
+          allPhaseII = allPhaseII.filter(s => {
+            const start = s.eventStartDate ? new Date(s.eventStartDate) : null;
+            return start && start >= yearObj.from && start <= yearObj.to;
+          });
+        }
+      }
+
+      setPhaseISubmissions(allPhaseI);
       setPhaseIISubmissions(allPhaseII);
 
       // Fetch classes
@@ -299,6 +340,27 @@ const InnovationCoordinatorDashboard = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Event Type & Academic Year Filters */}
+      <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Event Type</InputLabel>
+          <Select value={eventTypeFilter} label="Event Type" onChange={e => setEventTypeFilter(e.target.value)}>
+            {eventTypes.map(type => (
+              <MenuItem key={type} value={type}>{type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Academic Year</InputLabel>
+          <Select value={academicYearFilter} label="Academic Year" onChange={e => setAcademicYearFilter(e.target.value)}>
+            <MenuItem value="all">All Years</MenuItem>
+            {academicYears.map(y => (
+              <MenuItem key={y.label} value={y.label}>{y.label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
 
       {/* Class Filter & Phase Stats */}
       <Box sx={{ mb: 3 }}>
