@@ -1,10 +1,9 @@
+
 [build]
-  command = "cd client && npm run build"
+  command = "npm install && npm run build --prefix client"
   publish = "client/dist"
 
-[dev]
-  command = "npm run dev"
-  targetPort = 5173
+
 
 [[redirects]]
   from = "/*"
