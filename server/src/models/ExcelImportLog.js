@@ -55,7 +55,8 @@ const excelImportLogSchema = new mongoose.Schema({
   },
   completedAt: Date
 }, {
-  timestamps: true
+  timestamps: true,
+  suppressReservedKeysWarning: true
 });
 
 // Indexes
