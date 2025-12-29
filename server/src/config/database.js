@@ -3,7 +3,8 @@ const logger = require('./logger');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/student-participation-tracker';
+    const conn = await mongoose.connect(uri);
 
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
 
