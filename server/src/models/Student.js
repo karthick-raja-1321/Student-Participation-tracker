@@ -71,8 +71,7 @@ const studentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound indexes for performance
-studentSchema.index({ rollNumber: 1 });
+// Compound indexes for performance (unique fields already create indexes)
 studentSchema.index({ departmentId: 1, year: 1, section: 1 });
 studentSchema.index({ advisorId: 1 });
 studentSchema.index({ mentorId: 1 });

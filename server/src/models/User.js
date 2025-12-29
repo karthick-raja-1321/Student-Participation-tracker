@@ -74,10 +74,8 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for performance
-userSchema.index({ email: 1 });
+// Index for performance (unique fields already create indexes)
 userSchema.index({ role: 1, departmentId: 1 });
-userSchema.index({ employeeId: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function() {

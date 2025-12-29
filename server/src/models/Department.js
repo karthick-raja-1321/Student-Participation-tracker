@@ -47,8 +47,7 @@ const departmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for performance
-departmentSchema.index({ code: 1 });
+// Index for performance (unique fields already create indexes)
 departmentSchema.index({ isActive: 1 });
 
 module.exports = mongoose.model('Department', departmentSchema);

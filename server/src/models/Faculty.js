@@ -63,8 +63,7 @@ const facultySchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for performance
-facultySchema.index({ employeeId: 1 });
+// Indexes for performance (unique fields already create indexes)
 facultySchema.index({ departmentId: 1 });
 facultySchema.index({ 'advisorForClasses.year': 1, 'advisorForClasses.section': 1 });
 

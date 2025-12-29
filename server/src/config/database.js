@@ -3,7 +3,11 @@ const logger = require('./logger');
 
 const connectDB = async () => {
   try {
-    const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/student-participation-tracker';
+    const uri = process.env.MONGODB_URI;
+    if (!uri) {
+      logger.error('MONGODB_URI is not set. Set the MONGODB_URI environment variable to your MongoDB Atlas connection string.');
+      process.exit(1);
+    }
     const conn = await mongoose.connect(uri);
 
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
