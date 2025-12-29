@@ -13,7 +13,11 @@ const { NOTIFICATION_TYPES } = require('./src/config/constants');
 
 async function createMentorNotification() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/student-participation-tracker');
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI environment variable is required.');
+      process.exit(1);
+    }
+    await mongoose.connect(process.env.MONGODB_URI);
 
     console.log('\n=== CREATING MENTOR NOTIFICATION FOR FACULTY13 ===\n');
 

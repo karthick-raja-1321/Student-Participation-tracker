@@ -13,7 +13,11 @@ const Faculty = require('./src/models/Faculty');
 async function getSubmissionDetails() {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/student-participation-tracker');
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI environment variable is required.');
+      process.exit(1);
+    }
+    await mongoose.connect(process.env.MONGODB_URI);
 
     console.log('\n=== FETCHING LATEST SUBMISSION ===\n');
 

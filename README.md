@@ -237,3 +237,43 @@ This is a development version. Production deployment requires:
 ## 📞 Support
 
 For issues and questions, please create an issue in the repository.
+
+## 📁 Deployment & Environment (Cloud + Local)
+
+Required environment variables (server):
+- `MONGODB_URI` — MongoDB Atlas connection string (required). Example:
+   mongodb+srv://user:password@cluster0.abcd.mongodb.net/student-participation-tracker?retryWrites=true&w=majority
+- `JWT_SECRET`, `JWT_REFRESH_SECRET` — secrets for JWT tokens.
+- `CLIENT_URL` — frontend origin for OAuth/CORS (optional).
+- `FRONTEND_ORIGINS` — comma-separated allowed origins for CORS (e.g. `https://spt-client.onrender.com,https://your-vercel-app.vercel.app,http://localhost:5173`). When empty, CORS remains permissive for development.
+
+Client environment variables:
+- `VITE_API_BASE` (or `VITE_API_URL`) — base URL for API calls, e.g. `https://spt-server.onrender.com/api` or `http://localhost:5000/api` for local.
+
+Quick values for common hosts:
+- Render (backend): set secret `MONGODB_URI` and env `FRONTEND_ORIGINS` to include deployed frontend URLs and `http://localhost:5173`.
+- Vercel (frontend): set `VITE_API_BASE` to your Render backend URL.
+
+Local development checklist:
+- Install Node.js 18+.
+- Install project dependencies in both `server` and `client` (`npm install`).
+- Ensure `MONGODB_URI` is set in `server/.env` (you can use Atlas URI or `mongodb://localhost:27017/student-participation-tracker`).
+- Start backend: `cd server && npm run dev`.
+- Start frontend: `cd client && npm run dev`.
+
+Cloud hosting checklist:
+- Backend (Render recommended):
+   - Create a Web Service connected to this repo branch.
+   - Add a secret `MONGODB_URI` (Atlas URI) in Render and add it as an environment variable to the service.
+   - Add `FRONTEND_ORIGINS` env var with allowed frontend origins.
+   - Build command: `cd server && npm ci`; Start command: `cd server && npm start`.
+- Frontend (Vercel or Cloudflare Pages recommended):
+   - Vercel: set Root Directory to `client`, Build Command `npm run build`, Output `dist`.
+   - Add `VITE_API_BASE` env var pointing to the Render backend API.
+
+Security notes:
+- Never commit `.env` to source control. Use host-provided secrets.
+- Restrict `FRONTEND_ORIGINS` to your known domains in production.
+- Rotate DB credentials if accidentally leaked.
+
+If you want, I can add a small `DEPLOY.md` with step-by-step GUI instructions for Render and Vercel.

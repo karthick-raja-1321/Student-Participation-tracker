@@ -14,7 +14,11 @@ const EventView = require('./src/models/EventView');
 
 async function connectDB() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/student-participation-tracker');
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI environment variable is required.');
+      process.exit(1);
+    }
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('✓ Connected to MongoDB');
   } catch (error) {
     console.error('✗ Database connection failed:', error.message);

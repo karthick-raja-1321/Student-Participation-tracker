@@ -2,7 +2,12 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const EventView = require('./src/models/EventView');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/student-participation';
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error('MONGODB_URI environment variable is required.');
+  process.exit(1);
+}
 
 async function checkViews() {
   try {

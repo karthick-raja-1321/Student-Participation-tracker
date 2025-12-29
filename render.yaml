@@ -1,0 +1,31 @@
+# Render manifest for Student Participation Tracker
+# - This file is optional. You can create services from the Render dashboard instead.
+# - Before deploying, add a secret `MONGODB_URI` in Render and set it as an env var for the web service.
+
+services:
+  - type: web
+    name: spt-server
+    env: node
+    repo: https://github.com/karthick-raja-1321/Student-Participation-tracker
+    branch: master
+    plan: free
+    buildCommand: cd server && npm ci
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Do NOT store the DB URI here. Create a Render secret named MONGODB_URI and add it in the dashboard.
+
+static_sites:
+  - type: static_site
+    name: spt-client
+    repo: https://github.com/karthick-raja-1321/Student-Participation-tracker
+    branch: master
+    buildCommand: npm ci && npm run build --prefix client
+    publishPath: client/dist
+
+# Notes:
+# 1) Create a secret in Render dashboard named `MONGODB_URI` with your Atlas connection string.
+# 2) In the web service settings, add an env var `MONGODB_URI` that references that secret.
+# 3) The server enforces that MONGODB_URI must be set; otherwise it will exit.
+# 4) After creating services, trigger a deploy (auto-deploy on push will also work).

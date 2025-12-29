@@ -13,7 +13,11 @@ const User = require('./src/models/User');
 async function testInnovationCoordinatorApproval() {
   try {
     console.log('🔗 Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/faculty-role-management-dev');
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI environment variable is required.');
+      process.exit(1);
+    }
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connected to MongoDB\n');
 
     // Get Faculty1 (Advisor - FAC2000) and Faculty2 (Innovation Coordinator - FAC2001)

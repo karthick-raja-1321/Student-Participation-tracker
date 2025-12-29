@@ -34,9 +34,14 @@ connectDB();
 
 // Middleware
 app.use(helmet());
-// Dev-friendly CORS: allow any origin while still permitting credentials; tighten in prod via CLIENT_URL
+// CORS: allow only origins listed in FRONTEND_ORIGINS (comma-separated)
+const allowedOrigins = (process.env.FRONTEND_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({
-  origin: (origin, callback) => callback(null, true),
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow non-browser tools (curl, server-to-server)
+    if (allowedOrigins.length === 0) return callback(null, true); // no restriction configured
+    return allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));

@@ -5,7 +5,11 @@ const Event = require('./src/models/Event');
 
 async function updateEventVisibility() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/student-participation');
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI environment variable is required. Set it to your MongoDB Atlas connection string.');
+      process.exit(1);
+    }
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
 
     // Find all events

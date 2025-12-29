@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Grid, Paper, Typography, Box, CircularProgress, Button, Card, CardContent, IconButton, Tooltip } from '@mui/material';
+import { Grid, Paper, Typography, Box, CircularProgress, Button, Card, CardContent, IconButton, Tooltip, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { 
   Event, Assignment, CheckCircle, EmojiEvents, 
   People, School, Pending, Assessment, Refresh, TrendingUp, Settings, NotificationsActive, Brightness4, Brightness7
@@ -24,6 +24,8 @@ const Dashboard = () => {
   const [performerYearFilter, setPerformerYearFilter] = useState('all'); // Year filter for performers
   const [deptSectionFilter, setDeptSectionFilter] = useState('all'); // Department section filter
   const [deptYearFilter, setDeptYearFilter] = useState('all'); // Department year filter
+  // Admin-specific filters (lifted to top-level to keep Hooks order stable)
+  const [adminEventType, setAdminEventType] = useState('all');
 
   // Build dynamic list of event types (from data)
   const eventTypesFromData = useMemo(() => {
@@ -46,6 +48,50 @@ const Dashboard = () => {
   const allEventTypes = useMemo(() => {
     return ['all', ...eventTypesFromData];
   }, [eventTypesFromData]);
+
+  // Derived lists from dashboard data (used by admin and other views)
+  const eventsList = dashboardData?.rawData?.events || [];
+  const studentsList = dashboardData?.rawData?.students || [];
+  const registrationsList = dashboardData?.rawData?.registrations || [];
+  const submissionsList = dashboardData?.rawData?.submissions || [];
+
+  // Admin event types derived from eventsList
+  const adminEventTypes = useMemo(() => {
+    const types = new Set();
+    eventsList.forEach(e => {
+      const t = (e?.eventType || '').toString().trim().toLowerCase();
+      if (t) types.add(t);
+    });
+    return ['all', ...Array.from(types)];
+  }, [eventsList]);
+
+  // Class-wise stats for admin (lifted to top-level)
+  const classStats = useMemo(() => {
+    const stats = {};
+    const filteredEventIds = new Set(eventsList.filter(e => adminEventType === 'all' || (e.eventType || '').toLowerCase() === adminEventType).map(e => e._id?.toString()));
+    registrationsList.forEach(r => {
+      if (!filteredEventIds.has(r.eventId?.toString())) return;
+      const stu = studentsList.find(s => s._id?.toString() === r.studentId?.toString());
+      if (!stu) return;
+      const classKey = `${stu.year || 'N/A'}-${stu.section || 'N/A'}`;
+      if (!stats[classKey]) stats[classKey] = { students: new Set(), prizeAmount: 0 };
+      stats[classKey].students.add(stu._id?.toString());
+    });
+    submissionsList.forEach(s => {
+      if (!filteredEventIds.has(s.eventId?.toString())) return;
+      if (s.status !== 'APPROVED') return;
+      const stu = studentsList.find(stu => stu._id?.toString() === s.studentId?.toString());
+      if (!stu) return;
+      const classKey = `${stu.year || 'N/A'}-${stu.section || 'N/A'}`;
+      if (!stats[classKey]) stats[classKey] = { students: new Set(), prizeAmount: 0 };
+      stats[classKey].prizeAmount += Number(s?.prizeDetails?.prizeAmount || 0);
+    });
+    return Object.entries(stats).map(([classKey, val]) => ({
+      classKey,
+      studentsParticipated: val.students.size,
+      prizeAmount: val.prizeAmount
+    })).sort((a, b) => a.classKey.localeCompare(b.classKey));
+  }, [adminEventType, eventsList, studentsList, registrationsList, submissionsList]);
 
   const fetchDashboardData = async () => {
     try {
@@ -924,53 +970,8 @@ const Dashboard = () => {
       { title: 'Total Students', value: dashboardData?.generalStats?.totalStudents.toString() || '0', icon: <School />, color: '#7B1FA2' },
     ];
 
-    // Event type filter for participation/prize stats
-    const [adminEventType, setAdminEventType] = useState('all');
-    const eventsList = dashboardData?.rawData?.events || [];
-    const studentsList = dashboardData?.rawData?.students || [];
-    const registrations = dashboardData?.rawData?.registrations || [];
-    const submissions = dashboardData?.rawData?.submissions || [];
-    const eventTypes = useMemo(() => {
-      const types = new Set();
-      eventsList.forEach(e => {
-        const t = (e?.eventType || '').toString().trim().toLowerCase();
-        if (t) types.add(t);
-      });
-      return ['all', ...Array.from(types)];
-    }, [eventsList]);
-
-    // Class-wise stats: { [classKey]: { studentsParticipated, prizeAmount } }
-    const classStats = useMemo(() => {
-      // Map: year-section => { students: Set, prizeAmount }
-      const stats = {};
-      // Filter events by type
-      const filteredEventIds = new Set(eventsList.filter(e => adminEventType === 'all' || (e.eventType || '').toLowerCase() === adminEventType).map(e => e._id?.toString()));
-      // Participation: students who registered for filtered events
-      registrations.forEach(r => {
-        if (!filteredEventIds.has(r.eventId?.toString())) return;
-        const stu = studentsList.find(s => s._id?.toString() === r.studentId?.toString());
-        if (!stu) return;
-        const classKey = `${stu.year || 'N/A'}-${stu.section || 'N/A'}`;
-        if (!stats[classKey]) stats[classKey] = { students: new Set(), prizeAmount: 0 };
-        stats[classKey].students.add(stu._id?.toString());
-      });
-      // Prize: sum prizeAmount for approved submissions in filtered events
-      submissions.forEach(s => {
-        if (!filteredEventIds.has(s.eventId?.toString())) return;
-        if (s.status !== 'APPROVED') return;
-        const stu = studentsList.find(stu => stu._id?.toString() === s.studentId?.toString());
-        if (!stu) return;
-        const classKey = `${stu.year || 'N/A'}-${stu.section || 'N/A'}`;
-        if (!stats[classKey]) stats[classKey] = { students: new Set(), prizeAmount: 0 };
-        stats[classKey].prizeAmount += Number(s?.prizeDetails?.prizeAmount || 0);
-      });
-      // Convert to array for table
-      return Object.entries(stats).map(([classKey, val]) => ({
-        classKey,
-        studentsParticipated: val.students.size,
-        prizeAmount: val.prizeAmount
-      })).sort((a, b) => a.classKey.localeCompare(b.classKey));
-    }, [adminEventType, eventsList, studentsList, registrations, submissions]);
+    // Use top-level admin hooks/lists: `adminEventType`, `adminEventTypes`, `eventsList`,
+    // `studentsList`, `registrationsList`, `submissionsList`, and `classStats`.
 
     // ...existing code for latestEvents, upcomingEvents, recentPrizeWinners...
     const studentById = new Map(studentsList.map(s => [s._id?.toString(), s]));
@@ -989,7 +990,7 @@ const Dashboard = () => {
       })
       .sort((a, b) => safeDate(a.startDate) - safeDate(b.startDate))
       .slice(0, 5);
-    const recentPrizeWinners = (submissions || [])
+    const recentPrizeWinners = (submissionsList || [])
       .filter(s => Number(s?.prizeDetails?.prizeAmount || 0) > 0 && s?.prizeDetails?.wonPrize && s?.status === 'APPROVED')
       .sort((a, b) => (safeDate(b.updatedAt || b.submittedAt || b.createdAt) - safeDate(a.updatedAt || a.submittedAt || a.createdAt)))
       .slice(0, 5)
@@ -1040,7 +1041,7 @@ const Dashboard = () => {
             <FormControl size="small" sx={{ minWidth: 180 }}>
               <InputLabel>Event Type</InputLabel>
               <Select value={adminEventType} label="Event Type" onChange={e => setAdminEventType(e.target.value)}>
-                {eventTypes.map(type => (
+                {adminEventTypes.map(type => (
                   <MenuItem key={type} value={type}>{type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}</MenuItem>
                 ))}
               </Select>

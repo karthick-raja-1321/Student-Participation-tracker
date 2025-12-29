@@ -8,7 +8,11 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/spt');
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI environment variable is required. Set it to your MongoDB Atlas connection string.');
+      process.exit(1);
+    }
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('MongoDB Connected');
   } catch (error) {
     console.error('MongoDB connection failed:', error.message);

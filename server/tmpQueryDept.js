@@ -4,7 +4,11 @@ const Dept = require('./src/models/Department');
 
 (async () => {
   dotenv.config();
-  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/student-participation-tracker');
+  if (!process.env.MONGODB_URI) {
+    console.error('MONGODB_URI environment variable is required.');
+    process.exit(1);
+  }
+  await mongoose.connect(process.env.MONGODB_URI);
   const dept = await Dept.findOne({ code: 'CSE' }).lean();
   console.log(dept);
   await mongoose.disconnect();

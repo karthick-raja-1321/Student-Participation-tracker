@@ -7,7 +7,11 @@ const Department = require('./src/models/Department');
 
 (async () => {
   dotenv.config();
-  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/student-participation-tracker');
+  if (!process.env.MONGODB_URI) {
+    console.error('MONGODB_URI environment variable is required.');
+    process.exit(1);
+  }
+  await mongoose.connect(process.env.MONGODB_URI);
 
   const email = 'student.cse1@sece.ac.in';
   const rollNumber = 'CSE001';
